@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { erpFetch } from '@/lib/erp-api'
 
@@ -31,6 +32,7 @@ function statusLabel(status: string): string {
 }
 
 export default function DispatchPage() {
+  const router = useRouter()
   const [rows, setRows] = useState<DispatchSalesOrder[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -85,9 +87,13 @@ export default function DispatchPage() {
                 </thead>
                 <tbody>
                   {dispatchRows.map((row) => (
-                    <tr key={row.id} className="border-b">
+                    <tr
+                      key={row.id}
+                      className="border-b cursor-pointer hover:bg-muted/40"
+                      onClick={() => router.push(`/dashboard/dispatch/${row.id}`)}
+                    >
                       <td className="py-2 pr-3 font-mono">
-                        <Link className="hover:underline" href={`/dashboard/sales/${row.id}`}>
+                        <Link className="hover:underline" href={`/dashboard/dispatch/${row.id}`} onClick={(e) => e.stopPropagation()}>
                           {row.order_number ?? row.id.slice(0, 8)}
                         </Link>
                       </td>

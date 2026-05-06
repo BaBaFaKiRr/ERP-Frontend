@@ -9,30 +9,33 @@ import {
 } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Plus } from 'lucide-react'
+import Link from 'next/link'
 
 export default function FinancePage() {
   return (
     <div className="p-8">
       <div className="flex justify-between items-start mb-8">
         <div>
-          <h1 className="text-4xl font-bold text-gray-900 dark:text-white">Finance & Accounting</h1>
-          <p className="text-gray-600 mt-2">Manage invoices, payments, and financial transactions</p>
+          <h1 className="text-4xl font-bold text-gray-900 dark:text-white">Accounts</h1>
+          <p className="text-gray-600 mt-2">Manage invoice requests, payments, and accounting workflows</p>
         </div>
-        <Button className="flex items-center gap-2">
+        <Button className="flex items-center gap-2" asChild>
+          <Link href="/dashboard/finance/invoice-requests">
           <Plus size={18} />
-          Create Invoice
+          Invoice Requests
+          </Link>
         </Button>
       </div>
 
       <Card>
         <CardHeader>
-          <CardTitle>Finance Management</CardTitle>
+          <CardTitle>Accounts Management</CardTitle>
           <CardDescription>
-            Process: Sale/Purchase Order → Generate Invoice → Record Payment → Financial Reports
+            Process: Dispatch Order → Invoice Request → Invoice generation → Payment tracking
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <p className="text-gray-600">Finance module coming soon...</p>
+          <p className="text-gray-600">Use Invoice Requests to start invoicing dispatch orders.</p>
         </CardContent>
       </Card>
     </div>

@@ -44,6 +44,11 @@ const MANUFACTURING_CHILDREN = [
   { name: 'Work Orders', href: '/dashboard/manufacturing/work-orders' },
 ] as const
 
+const ACCOUNTS_CHILDREN = [
+  { name: 'Overview', href: '/dashboard/finance' },
+  { name: 'Invoice Requests', href: '/dashboard/finance/invoice-requests' },
+] as const
+
 function inventoryChildActive(pathname: string, href: (typeof INVENTORY_CHILDREN)[number]['href']) {
   if (href === '/dashboard/inventory') {
     return pathname === '/dashboard/inventory'
@@ -73,7 +78,6 @@ const navigationAfterInventory = [
   { name: 'Sales Orders', href: '/dashboard/sales', icon: ShoppingCart },
   { name: 'Purchase Orders', href: '/dashboard/purchase', icon: Package2 },
   { name: 'Dispatch', href: '/dashboard/dispatch', icon: Truck },
-  { name: 'Finance', href: '/dashboard/finance', icon: DollarSign },
   { name: 'HR & Employees', href: '/dashboard/hr', icon: Users },
   { name: 'Admin', href: '/dashboard/admin', icon: Settings },
 ]
@@ -230,6 +234,79 @@ function ManufacturingSidebarSection({ sidebarOpen }: { sidebarOpen: boolean }) 
   )
 }
 
+function accountsChildActive(pathname: string, href: (typeof ACCOUNTS_CHILDREN)[number]['href']) {
+  if (href === '/dashboard/finance') return pathname === '/dashboard/finance'
+  return pathname.startsWith('/dashboard/finance/invoice-requests')
+}
+
+function AccountsSidebarSection({ sidebarOpen }: { sidebarOpen: boolean }) {
+  const pathname = usePathname()
+  const underAccounts = pathname.startsWith('/dashboard/finance')
+  const [expanded, setExpanded] = useState(underAccounts)
+
+  useEffect(() => {
+    if (underAccounts) setExpanded(true)
+  }, [underAccounts])
+
+  if (!sidebarOpen) {
+    return (
+      <Link
+        href="/dashboard/finance"
+        className={cn(
+          'text-app-nav-text-muted hover:text-app-nav-text flex items-center justify-center rounded-xl p-3 transition-colors hover:bg-slate-100 dark:hover:bg-white/10',
+          underAccounts && 'bg-slate-100 text-app-nav-text dark:bg-white/10',
+        )}
+        title="Accounts"
+      >
+        <DollarSign size={20} />
+      </Link>
+    )
+  }
+
+  return (
+    <div className="mb-1">
+      <button
+        type="button"
+        onClick={() => setExpanded((e) => !e)}
+        className={cn(
+          'text-app-nav-text-muted hover:text-app-nav-text flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition-colors hover:bg-slate-100 dark:hover:bg-white/10',
+          underAccounts && 'bg-slate-100 text-app-nav-text dark:bg-white/10',
+        )}
+        aria-expanded={expanded}
+      >
+        <DollarSign size={20} className="shrink-0" />
+        <span className="flex-1 font-medium">Accounts</span>
+        {expanded ? (
+          <ChevronDown size={18} className="shrink-0 opacity-80" />
+        ) : (
+          <ChevronRight size={18} className="shrink-0 opacity-80" />
+        )}
+      </button>
+      {expanded && (
+        <div className="mt-1 space-y-1 border-l border-slate-200 ml-6 pl-2 mr-2 py-1 dark:border-white/15">
+          {ACCOUNTS_CHILDREN.map((child) => {
+            const active = accountsChildActive(pathname, child.href)
+            return (
+              <Link
+                key={child.href}
+                href={child.href}
+                className={cn(
+                  'block rounded-lg px-3 py-2 text-sm transition-colors',
+                  active
+                    ? 'bg-slate-100 text-app-nav-text font-medium dark:bg-white/10'
+                    : 'text-app-nav-text-muted hover:text-app-nav-text hover:bg-slate-100 dark:hover:bg-white/10',
+                )}
+              >
+                {child.name}
+              </Link>
+            )
+          })}
+        </div>
+      )}
+    </div>
+  )
+}
+
 export default function DashboardLayout({
   children,
 }: {
@@ -291,6 +368,7 @@ export default function DashboardLayout({
 
           <InventorySidebarSection sidebarOpen={sidebarOpen} />
           <ManufacturingSidebarSection sidebarOpen={sidebarOpen} />
+          <AccountsSidebarSection sidebarOpen={sidebarOpen} />
 
           {navigationAfterInventory.map((item) => (
             <Link
