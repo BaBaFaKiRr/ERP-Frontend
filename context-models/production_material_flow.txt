@@ -1,0 +1,41 @@
+I want to change the way we are requesting, assigning and entering material for production.
+
+I want a "Material in Hand" page as a sub-page under Manufacturing module
+On this page, we display all material present at production lines including raw material and finished/semi-finished goods
+From this page, we request the store to issue raw material and deposit finished good and rejection.
+We assign raw material from this page's issued stock to production and assembly lines.
+
+So, On material at hand page, we will have 2 sub-headings: Finished, Semi Finished goods and Raw Material
+Example Layout:
+---------------------------------------------------------------------------------------------------------
+Material At Hand
+                                                            <button>Issue</button> <button>Deposit</button>
+Finished goods                                                         
+Table Columns: pick, SKU(clickable-> takes to item details page), Item (clickable-> takes to item details page), Qty
+<add search by sku/item, filter by and sort by features on the table>
+
+Semi-finished goods
+Table Columns: pick, SKU(clickable-> takes to item details page), Item (clickable-> takes to item details page), Qty
+<add search by sku/item, filter by and sort by features on the table>
+
+Raw Material
+Table Columns: pick, SKU(clickable-> takes to item details page), Item (clickable-> takes to item details page), Qty
+<add search by sku/item, filter by and sort by features on the table>
+
+Material Requests
+Table Columns: pick, Request No. ,Sales Order No., Work Order No., Request Type (issue/deposit), Status(Approved/Pending)
+<Each row is clickable and takes to request details page>
+---------------------------------------------------------------------------------------------------------
+Sample Issue Request Form (a separate material issue request page)
+---------------------------------------------------------------------------------------------------------
+Material Issue Request Form
+
+Date and time(default current date and time immutable)
+Requesting person(default to logged in user immutable)
+Against Work Orders: (Search bar displaying all open work orders, multi selection allowed) 
+Material Table:
+Work Order No.:
+    Item: H4
+    BOM: H4 Capsule:
+
+

@@ -1,0 +1,23 @@
+/** Must match ERP-Backend `src/lib/finished-good-categories.ts`. */
+export const FINISHED_GOOD_CATEGORIES = [
+  'Halogen',
+  'HID',
+  'LED',
+  'Projector',
+  'Miniature',
+  'Wiper',
+  'Relay',
+  'Wiring Harness',
+  'Horn',
+  'Headlight',
+  'Lubricant oil',
+  'Coolant',
+  'Switch',
+  'Dashcam',
+  'Tire Inflator',
+  'Parking Camera',
+  'GPS',
+  'Android',
+  'Ambient Light',
+  'Perfume',
+] as const

@@ -15,7 +15,7 @@ export default function FinancePage() {
     <div className="p-8">
       <div className="flex justify-between items-start mb-8">
         <div>
-          <h1 className="text-4xl font-bold text-gray-900">Finance & Accounting</h1>
+          <h1 className="text-4xl font-bold text-gray-900 dark:text-white">Finance & Accounting</h1>
           <p className="text-gray-600 mt-2">Manage invoices, payments, and financial transactions</p>
         </div>
         <Button className="flex items-center gap-2">

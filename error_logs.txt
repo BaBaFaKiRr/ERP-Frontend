@@ -1,0 +1,187 @@
+This is a classic HTML → PDF / download rendering mismatch problem in Next.js apps. Your preview looks correct because it’s rendered in the browser with full CSS context, but the downloaded version is being generated in a different rendering environment that does not interpret your styles the same way.
+
+Let’s break down the likely root causes precisely:
+
+🔴 Root Causes (Most Likely → Least Likely)
+1. ❗ Using window.print() or print CSS without proper print styles
+
+If you're doing:
+
+window.print()
+
+or generating a PDF via print,
+
+👉 Browsers switch to print media mode:
+
+Tailwind classes may not fully apply
+Flex/Grid often break
+Margins/paddings collapse
+Fonts may fallback
+Fix
+
+Add explicit print styles:
+
+@media print {
+  body {
+    font-family: Arial, sans-serif;
+  }
+}
+2. ❗ CSS not included in PDF renderer (VERY COMMON)
+
+If you're using:
+
+html2pdf.js
+jspdf
+puppeteer
+react-to-pdf
+
+👉 These tools often:
+
+Do NOT load external CSS (especially Tailwind CDN / global.css)
+Ignore dynamic styles
+Fail on modern layout systems (flex/grid)
+Symptoms (matches your issue):
+Table becomes plain text
+No borders
+No alignment
+Fonts reset
+3. ❗ Tailwind CSS not being resolved in export
+
+If you're using Tailwind:
+
+👉 Tailwind classes exist only in runtime CSS bundle
+PDF tools don’t “see” them unless:
+
+Styles are inlined
+Or full CSS is injected
+4. ❗ Using innerHTML cloning without styles
+
+If you do something like:
+
+const content = document.getElementById("invoice").innerHTML;
+
+👉 You lose:
+
+<style> tags
+CSS modules
+Tailwind context
+5. ❗ Server-side PDF generation without CSS injection
+
+If using Puppeteer or backend rendering:
+
+👉 Unless you explicitly:
+
+await page.addStyleTag({ path: 'styles.css' })
+
+You get unstyled HTML.
+
+6. ❗ Absolute vs relative styling differences
+
+Your preview uses:
+
+Containers
+Flex/grid layout
+
+But PDF engines prefer:
+
+Tables
+Inline styles
+🧠 Diagnosis from Your Screenshots
+Preview:
+
+✔ Proper table
+✔ Borders
+✔ Alignment
+✔ Structured layout
+
+Download:
+
+❌ No table structure
+❌ No borders
+❌ Plain text flow
+❌ No spacing
+
+👉 This strongly indicates:
+
+⚠️ CSS is NOT being applied at all in the export step
+
+✅ Best Fixes (Ranked by Reliability)
+🥇 Option 1: Use Puppeteer (BEST for ERP systems)
+
+Server-side rendering with full CSS support.
+
+await page.setContent(html, { waitUntil: 'networkidle0' });
+await page.pdf({ format: 'A4' });
+
+AND include styles:
+
+await page.addStyleTag({ path: './styles.css' });
+🥈 Option 2: Inline Critical Styles (Quick Fix)
+
+Convert layout to inline CSS:
+
+<table style="border-collapse: collapse; width: 100%;">
+
+Avoid:
+
+Tailwind classes
+External CSS
+🥉 Option 3: Use react-to-print properly
+
+Wrap printable component:
+
+const componentRef = useRef();
+useReactToPrint({
+  content: () => componentRef.current,
+});
+
+AND define print styles.
+
+🥉 Option 4: Dedicated “Print Layout” Component
+
+Create a separate version:
+
+<InvoicePrintView />
+
+Use:
+
+Pure HTML tables
+Inline styles
+No flex/grid
+🚫 What NOT to do
+❌ Don’t rely on Tailwind for PDF
+❌ Don’t use flexbox-heavy layouts
+❌ Don’t assume browser preview = PDF output
+🧩 Recommended Architecture (For Your ERP)
+
+Given your scale (ERP + invoices):
+
+👉 Use this pipeline:
+
+React UI (Preview)
+        ↓
+API Route (Next.js)
+        ↓
+Puppeteer renders HTML + CSS
+        ↓
+PDF download
+
+This ensures:
+
+Pixel-perfect invoices
+Scalable
+Professional output
+🎯 Bottom Line
+
+Your issue is not a bug, it's an architectural mismatch:
+
+✅ Browser preview = full CSS engine
+❌ PDF/export = limited or no CSS engine
+
+If you want, I can:
+
+Suggest exact library setup (Puppeteer vs html2pdf)
+Refactor your invoice component for perfect PDF output
+Give you a production-grade invoice rendering pipeline (used in SaaS ERPs)
+
+Just tell me what you're currently using for download.

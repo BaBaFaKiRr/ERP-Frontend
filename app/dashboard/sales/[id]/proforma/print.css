@@ -1,0 +1,38 @@
+@media print {
+  .pi-no-print {
+    display: none !important;
+  }
+
+  /* Hide dashboard chrome when printing from proforma preview */
+  body:has(.proforma-print-root) aside {
+    display: none !important;
+  }
+  body:has(.proforma-print-root) .flex.h-screen {
+    height: auto !important;
+    min-height: 0 !important;
+  }
+  body:has(.proforma-print-root) main {
+    width: 100% !important;
+    flex: none !important;
+    overflow: visible !important;
+  }
+
+  body:has(.proforma-print-root),
+  body:has(.proforma-print-root) html {
+    background: #fff !important;
+  }
+
+  .proforma-print-root {
+    background: #fff !important;
+  }
+
+  @page {
+    size: A4;
+    margin: 10mm 12mm;
+  }
+
+  body {
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+}

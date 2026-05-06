@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import {
   Card,
@@ -20,87 +20,65 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { Plus, Search } from 'lucide-react'
+import { erpFetch } from '@/lib/erp-api'
 
-// Mock purchase order data
-const mockPurchaseOrders = [
-  {
-    id: '1',
-    poNumber: 'PO-001',
-    supplier: 'Steel Supplies Inc',
-    date: '2024-03-01',
-    expectedDate: '2024-03-15',
-    amount: '$8,500',
-    status: 'approved',
-    items: 3,
-  },
-  {
-    id: '2',
-    poNumber: 'PO-002',
-    supplier: 'Plastic Components Ltd',
-    date: '2024-03-05',
-    expectedDate: '2024-03-20',
-    amount: '$6,200',
-    status: 'pending',
-    items: 2,
-  },
-  {
-    id: '3',
-    poNumber: 'PO-003',
-    supplier: 'Industrial Materials Co',
-    date: '2024-03-08',
-    expectedDate: '2024-03-25',
-    amount: '$12,300',
-    status: 'draft',
-    items: 4,
-  },
-  {
-    id: '4',
-    poNumber: 'PO-004',
-    supplier: 'Electronics Supplier',
-    date: '2024-02-25',
-    expectedDate: '2024-03-10',
-    amount: '$4,800',
-    status: 'completed',
-    items: 2,
-  },
-]
+type PurchaseOrderRow = {
+  id: string
+  po_number: string
+  status: string
+  order_date?: string | null
+  expected_delivery_date?: string | null
+  total_amount?: number | null
+  suppliers?: { name: string } | null
+  purchase_order_lines?: Array<{ id: string }> | null
+}
 
 const statusConfig = {
   draft: { color: 'bg-gray-100 text-gray-800', label: 'Draft' },
-  pending: { color: 'bg-yellow-100 text-yellow-800', label: 'Pending Approval' },
+  pending_approval: { color: 'bg-yellow-100 text-yellow-800', label: 'Pending Approval' },
   approved: { color: 'bg-blue-100 text-blue-800', label: 'Approved' },
   completed: { color: 'bg-green-100 text-green-800', label: 'Completed' },
+  cancelled: { color: 'bg-slate-200 text-slate-700', label: 'Cancelled' },
 }
 
 export default function PurchaseOrdersPage() {
   const [searchTerm, setSearchTerm] = useState('')
-  const [filteredOrders, setFilteredOrders] = useState(mockPurchaseOrders)
+  const [orders, setOrders] = useState<PurchaseOrderRow[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
-  const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const term = e.target.value
-    setSearchTerm(term)
+  useEffect(() => {
+    void load()
+  }, [])
 
-    const filtered = mockPurchaseOrders.filter(
-      (order) =>
-        order.poNumber.toLowerCase().includes(term.toLowerCase()) ||
-        order.supplier.toLowerCase().includes(term.toLowerCase())
-    )
-    setFilteredOrders(filtered)
+  const load = async () => {
+    setLoading(true)
+    setError(null)
+    try {
+      const res = await erpFetch<{ data: PurchaseOrderRow[] }>('/api/purchase/orders')
+      setOrders(res.data ?? [])
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to load purchase orders')
+    } finally {
+      setLoading(false)
+    }
   }
 
-  const totalValue = mockPurchaseOrders.reduce((sum, order) => {
-    const value = parseInt(order.amount.replace(/[^0-9]/g, ''))
-    return sum + value
-  }, 0)
+  const filteredOrders = orders.filter(
+    (order) =>
+      order.po_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (order.suppliers?.name ?? '').toLowerCase().includes(searchTerm.toLowerCase()),
+  )
 
-  const approvedOrders = mockPurchaseOrders.filter((o) => o.status === 'approved').length
-  const pendingOrders = mockPurchaseOrders.filter((o) => o.status === 'pending').length
+  const totalValue = orders.reduce((sum, order) => sum + Number(order.total_amount ?? 0), 0)
+  const approvedOrders = orders.filter((o) => o.status === 'approved').length
+  const pendingOrders = orders.filter((o) => o.status === 'pending_approval').length
 
   return (
     <div className="p-8">
       <div className="flex justify-between items-start mb-8">
         <div>
-          <h1 className="text-4xl font-bold text-gray-900">Purchase Orders</h1>
+          <h1 className="text-4xl font-bold text-gray-900 dark:text-white">Purchase Orders</h1>
           <p className="text-gray-600 mt-2">Manage purchase orders to suppliers</p>
         </div>
         <Link href="/dashboard/purchase/create">
@@ -111,14 +89,15 @@ export default function PurchaseOrdersPage() {
         </Link>
       </div>
 
-      {/* KPI Cards */}
+      {error && <p className="mb-4 text-sm text-red-600">{error}</p>}
+
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium">Total POs</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{mockPurchaseOrders.length}</div>
+            <div className="text-2xl font-bold">{orders.length}</div>
             <p className="text-xs text-gray-600">All time</p>
           </CardContent>
         </Card>
@@ -145,45 +124,21 @@ export default function PurchaseOrdersPage() {
             <CardTitle className="text-sm font-medium">Total Value</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">
-              ${(totalValue / 100).toLocaleString()}
-            </div>
+            <div className="text-2xl font-bold">₹{totalValue.toLocaleString('en-IN')}</div>
             <p className="text-xs text-gray-600">Purchase value</p>
           </CardContent>
         </Card>
       </div>
 
-      {/* Process Flow */}
       <Card className="mb-8">
         <CardHeader>
           <CardTitle>Purchase Order Process</CardTitle>
           <CardDescription>
-            Process: Material Request → Create PO → Admin Approval → Send to Supplier → Receive Goods
+            Material request → Create PO → Admin Approval → Send to Supplier → Receive Goods
           </CardDescription>
         </CardHeader>
-        <CardContent>
-          <div className="flex gap-4 overflow-x-auto pb-4">
-            {[
-              'Request Entry',
-              'Create PO',
-              'Admin Approval',
-              'Send to Supplier',
-              'Receive Goods',
-              'Complete',
-            ].map((step, index) => (
-              <div key={index} className="flex items-center gap-2 min-w-fit">
-                <div className="w-12 h-12 rounded-full bg-blue-100 text-blue-800 flex items-center justify-center font-bold">
-                  {index + 1}
-                </div>
-                <p className="text-sm font-medium text-gray-700">{step}</p>
-                {index < 5 && <div className="w-4 h-0.5 bg-gray-300"></div>}
-              </div>
-            ))}
-          </div>
-        </CardContent>
       </Card>
 
-      {/* Search and Filter */}
       <Card>
         <CardHeader>
           <CardTitle>Purchase Orders</CardTitle>
@@ -196,10 +151,13 @@ export default function PurchaseOrdersPage() {
               <Input
                 placeholder="Search by PO number or supplier..."
                 value={searchTerm}
-                onChange={handleSearch}
+                onChange={(e) => setSearchTerm(e.target.value)}
                 className="pl-10"
               />
             </div>
+            <Button type="button" variant="outline" onClick={() => void load()}>
+              Refresh
+            </Button>
           </div>
 
           <div className="overflow-x-auto">
@@ -210,37 +168,51 @@ export default function PurchaseOrdersPage() {
                   <TableHead>Supplier</TableHead>
                   <TableHead>Order Date</TableHead>
                   <TableHead>Expected Date</TableHead>
-                  <TableHead className="text-right">Amount</TableHead>
+                  <TableHead className="text-right">Amount (INR)</TableHead>
                   <TableHead>Items</TableHead>
                   <TableHead>Status</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredOrders.map((order) => (
-                  <TableRow key={order.id} className="hover:bg-gray-50">
-                    <TableCell className="font-mono font-semibold">{order.poNumber}</TableCell>
-                    <TableCell>{order.supplier}</TableCell>
-                    <TableCell>{order.date}</TableCell>
-                    <TableCell>{order.expectedDate}</TableCell>
-                    <TableCell className="text-right font-semibold">{order.amount}</TableCell>
-                    <TableCell>{order.items}</TableCell>
-                    <TableCell>
-                      <span
-                        className={`text-xs px-3 py-1 rounded-full ${
-                          statusConfig[order.status as keyof typeof statusConfig].color
-                        }`}
-                      >
-                        {statusConfig[order.status as keyof typeof statusConfig].label}
-                      </span>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <Button variant="ghost" size="sm">
-                        View
-                      </Button>
-                    </TableCell>
+                {loading ? (
+                  <TableRow>
+                    <TableCell colSpan={7}>Loading…</TableCell>
                   </TableRow>
-                ))}
+                ) : filteredOrders.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={7}>No purchase orders found.</TableCell>
+                  </TableRow>
+                ) : (
+                  filteredOrders.map((order) => (
+                    <TableRow key={order.id} className="hover:bg-gray-50">
+                      <TableCell className="font-mono font-semibold">{order.po_number}</TableCell>
+                      <TableCell>{order.suppliers?.name ?? '—'}</TableCell>
+                      <TableCell>
+                        {order.order_date ? new Date(order.order_date).toLocaleDateString('en-GB') : '—'}
+                      </TableCell>
+                      <TableCell>
+                        {order.expected_delivery_date
+                          ? new Date(order.expected_delivery_date).toLocaleDateString('en-GB')
+                          : '—'}
+                      </TableCell>
+                      <TableCell className="text-right font-semibold">
+                        {order.total_amount != null ? `₹${Number(order.total_amount).toFixed(2)}` : '—'}
+                      </TableCell>
+                      <TableCell>{order.purchase_order_lines?.length ?? 0}</TableCell>
+                      <TableCell>
+                        <span
+                          className={`text-xs px-3 py-1 rounded-full ${
+                            statusConfig[order.status as keyof typeof statusConfig]?.color ??
+                            'bg-gray-100 text-gray-800'
+                          }`}
+                        >
+                          {statusConfig[order.status as keyof typeof statusConfig]?.label ??
+                            order.status}
+                        </span>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
               </TableBody>
             </Table>
           </div>

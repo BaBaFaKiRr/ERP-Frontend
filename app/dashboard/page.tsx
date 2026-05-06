@@ -2,86 +2,26 @@
 
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import { erpFetch } from '@/lib/erp-api'
 import {
   Card,
   CardContent,
-  CardDescription,
   CardHeader,
   CardTitle,
 } from '@/components/ui/card'
-import {
-  BarChart,
-  Bar,
-  LineChart,
-  Line,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  Legend,
-  ResponsiveContainer,
-} from 'recharts'
-import { TrendingUp, Package, ShoppingCart, DollarSign, Clock } from 'lucide-react'
-
-// Mock data for charts
-const salesData = [
-  { month: 'Jan', sales: 4000, target: 5000 },
-  { month: 'Feb', sales: 3000, target: 5000 },
-  { month: 'Mar', sales: 2000, target: 5000 },
-  { month: 'Apr', sales: 2780, target: 5000 },
-  { month: 'May', sales: 1890, target: 5000 },
-  { month: 'Jun', sales: 2390, target: 5000 },
-]
-
-const inventoryData = [
-  { product: 'Product A', quantity: 400, reorderLevel: 300 },
-  { product: 'Product B', quantity: 300, reorderLevel: 250 },
-  { product: 'Product C', quantity: 200, reorderLevel: 200 },
-  { product: 'Product D', quantity: 278, reorderLevel: 250 },
-  { product: 'Product E', quantity: 189, reorderLevel: 100 },
-]
-
-interface KPICard {
-  title: string
-  value: string | number
-  change: string
-  trend: 'up' | 'down'
-  icon: React.ReactNode
-}
+import { Badge } from '@/components/ui/badge'
 
 export default function DashboardPage() {
   const supabase = createClient()
   const [user, setUser] = useState<any>(null)
-  const [kpis, setKpis] = useState<KPICard[]>([
-    {
-      title: 'Total Sales',
-      value: '$45,231',
-      change: '+12.5%',
-      trend: 'up',
-      icon: <DollarSign className="w-6 h-6" />,
-    },
-    {
-      title: 'Pending Orders',
-      value: '42',
-      change: '+3',
-      trend: 'up',
-      icon: <ShoppingCart className="w-6 h-6" />,
-    },
-    {
-      title: 'Low Stock Items',
-      value: '8',
-      change: '-2',
-      trend: 'down',
-      icon: <Package className="w-6 h-6" />,
-    },
-    {
-      title: 'Active Work Orders',
-      value: '15',
-      change: '+5',
-      trend: 'up',
-      icon: <Clock className="w-6 h-6" />,
-    },
-  ])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [metrics, setMetrics] = useState({
+    totalSalesOrders: 0,
+    pendingSalesApprovals: 0,
+    activeWorkOrders: 0,
+    purchasePendingApprovals: 0,
+  })
 
   useEffect(() => {
     const getUser = async () => {
@@ -94,159 +34,123 @@ export default function DashboardPage() {
     getUser()
   }, [supabase])
 
+  useEffect(() => {
+    void (async () => {
+      setLoading(true)
+      setError(null)
+      try {
+        const [salesRes, workRes, purchaseRes] = await Promise.all([
+          erpFetch<{ data: Array<{ status: string }> }>('/api/sales-orders'),
+          erpFetch<{ data: Array<{ status: string }> }>('/api/work-orders'),
+          erpFetch<{ data: Array<{ status: string }> }>('/api/purchase/orders'),
+        ])
+
+        const sales = salesRes.data ?? []
+        const workOrders = workRes.data ?? []
+        const purchaseOrders = purchaseRes.data ?? []
+
+        setMetrics({
+          totalSalesOrders: sales.length,
+          pendingSalesApprovals: sales.filter((s) => s.status === 'pending_approval').length,
+          activeWorkOrders: workOrders.filter((w) => ['pending', 'in_progress'].includes(w.status))
+            .length,
+          purchasePendingApprovals: purchaseOrders.filter((p) => p.status === 'pending_approval')
+            .length,
+        })
+      } catch (e) {
+        setError(e instanceof Error ? e.message : 'Failed to load dashboard')
+      } finally {
+        setLoading(false)
+      }
+    })()
+  }, [])
+
   return (
-    <div className="p-8">
+    <div className="p-6 md:p-8">
       <div className="mb-8">
-        <h1 className="text-4xl font-bold text-gray-900">Welcome to ERP Dashboard</h1>
-        <p className="text-gray-600 mt-2">
+        <h1 className="text-3xl font-semibold tracking-tight">Welcome to ERP Dashboard</h1>
+        <p className="mt-2 text-muted-foreground">
           {user?.email ? `Hello, ${user.email}` : 'Manufacturing Operations Center'}
         </p>
       </div>
 
-      {/* KPI Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-        {kpis.map((kpi, index) => (
-          <Card key={index}>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">{kpi.title}</CardTitle>
-              <div className={`text-${kpi.trend === 'up' ? 'green' : 'red'}-600`}>
-                {kpi.icon}
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{kpi.value}</div>
-              <p
-                className={`text-xs ${
-                  kpi.trend === 'up' ? 'text-green-600' : 'text-red-600'
-                }`}
-              >
-                {kpi.change} from last month
-              </p>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
+      {error && <p className="mb-4 text-sm text-red-600">{error}</p>}
 
-      {/* Charts */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
-        {/* Sales Chart */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Sales Performance</CardTitle>
-            <CardDescription>Monthly sales vs target</CardDescription>
+      <div className="mb-8 grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <Card className="border-border/70 bg-card/70 backdrop-blur-sm">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">Sales Orders</CardTitle>
           </CardHeader>
           <CardContent>
-            <ResponsiveContainer width="100%" height={300}>
-              <LineChart data={salesData}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="month" />
-                <YAxis />
-                <Tooltip />
-                <Legend />
-                <Line type="monotone" dataKey="sales" stroke="#3b82f6" />
-                <Line type="monotone" dataKey="target" stroke="#ef4444" strokeDasharray="5 5" />
-              </LineChart>
-            </ResponsiveContainer>
+            <div className="text-3xl font-semibold">{loading ? '…' : metrics.totalSalesOrders}</div>
           </CardContent>
         </Card>
-
-        {/* Inventory Chart */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Inventory Status</CardTitle>
-            <CardDescription>Current stock vs reorder level</CardDescription>
+        <Card className="border-border/70 bg-card/70 backdrop-blur-sm">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">Sales Pending Approval</CardTitle>
           </CardHeader>
           <CardContent>
-            <ResponsiveContainer width="100%" height={300}>
-              <BarChart data={inventoryData}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="product" />
-                <YAxis />
-                <Tooltip />
-                <Legend />
-                <Bar dataKey="quantity" fill="#3b82f6" />
-                <Bar dataKey="reorderLevel" fill="#fbbf24" />
-              </BarChart>
-            </ResponsiveContainer>
+            <div className="text-3xl font-semibold">{loading ? '…' : metrics.pendingSalesApprovals}</div>
+          </CardContent>
+        </Card>
+        <Card className="border-border/70 bg-card/70 backdrop-blur-sm">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">Active Work Orders</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-3xl font-semibold">{loading ? '…' : metrics.activeWorkOrders}</div>
+          </CardContent>
+        </Card>
+        <Card className="border-border/70 bg-card/70 backdrop-blur-sm">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">
+              Purchase Pending Approval
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-3xl font-semibold">
+              {loading ? '…' : metrics.purchasePendingApprovals}
+            </div>
           </CardContent>
         </Card>
       </div>
 
-      {/* Quick Actions */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <Card>
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+        <Card className="border-border/70 bg-card/70 backdrop-blur-sm">
           <CardHeader>
-            <CardTitle className="text-lg">Recent Orders</CardTitle>
+            <CardTitle className="text-lg">Operational Snapshot</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="space-y-4">
-              <div className="flex justify-between items-center py-2 border-b">
-                <span className="text-sm">SO-001</span>
-                <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">
-                  Approved
-                </span>
-              </div>
-              <div className="flex justify-between items-center py-2 border-b">
-                <span className="text-sm">SO-002</span>
-                <span className="text-xs bg-yellow-100 text-yellow-800 px-2 py-1 rounded">
-                  Pending
-                </span>
-              </div>
-              <div className="flex justify-between items-center py-2">
-                <span className="text-sm">SO-003</span>
-                <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded">
-                  Completed
-                </span>
-              </div>
-            </div>
+            <p className="text-sm text-muted-foreground">
+              Dashboard tiles now use live ERP data only. Add more analytics when your production data
+              volume grows.
+            </p>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg">Pending Approvals</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              <div className="flex justify-between items-center py-2 border-b">
-                <span className="text-sm">Material Entry #5</span>
-                <span className="text-xs">2 days ago</span>
-              </div>
-              <div className="flex justify-between items-center py-2 border-b">
-                <span className="text-sm">PO-004</span>
-                <span className="text-xs">1 day ago</span>
-              </div>
-              <div className="flex justify-between items-center py-2">
-                <span className="text-sm">Work Order #12</span>
-                <span className="text-xs">Just now</span>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
+        <Card className="border-border/70 bg-card/70 backdrop-blur-sm">
           <CardHeader>
             <CardTitle className="text-lg">System Status</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              <div className="flex justify-between items-center py-2 border-b">
+              <div className="flex items-center justify-between border-b border-border/50 py-2">
                 <span className="text-sm">Database</span>
-                <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded">
+                <Badge className="bg-emerald-500/15 text-emerald-500 hover:bg-emerald-500/15">
                   Operational
-                </span>
+                </Badge>
               </div>
-              <div className="flex justify-between items-center py-2 border-b">
+              <div className="flex items-center justify-between border-b border-border/50 py-2">
                 <span className="text-sm">API Server</span>
-                <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded">
+                <Badge className="bg-emerald-500/15 text-emerald-500 hover:bg-emerald-500/15">
                   Operational
-                </span>
+                </Badge>
               </div>
-              <div className="flex justify-between items-center py-2">
+              <div className="flex items-center justify-between py-2">
                 <span className="text-sm">Backups</span>
-                <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded">
-                  Recent
-                </span>
+                <Badge className="bg-emerald-500/15 text-emerald-500 hover:bg-emerald-500/15">
+                  Managed by Supabase
+                </Badge>
               </div>
             </div>
           </CardContent>

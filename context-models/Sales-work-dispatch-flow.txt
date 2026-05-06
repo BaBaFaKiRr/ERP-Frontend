@@ -1,0 +1,55 @@
+Sales Orders
+Below is a desired example sales order
+-------------------------------------------------------------------------------------------
+SO-2026-00001
+Customer:                Status:
+Order Date:              Expected Deliver Date:
+Total (INR):             Approved:
+            
+                                                    <button>Create Work Order</button> (takes user to generate work order page)
+Sales Order Items:
+Fields: pick, sku (clickable object which navigate to particular item's detail page), item (clickable object which navigate to particular item's detail page),
+ qty ordered, qty shipped(0 by default), qty available(stock in inventory), Unit Price, Total Amount
+H4               1000pcs
+H7                800pcs
+H11              2000pcs
+H4-LED            100pcs
+
+Work Orders: (work orders generated from this sales orders)
+Table fields: pick, WO number, item, Line, Status 
+<each table row is clickable object taking user to work order details page>
+
+--------------------------------------------------------------------------------------------
+below is an example of generate work order page
+
+Sales Order: <autofill from sales order> <immutable> <clickable takes to sales order details page>
+Item: <selected item from previous page>                       Qty: <from sales order>
+
+BOM: <fill in from that item's BOM>
+Bom table fields: Sno., item code, item name, qty per unit, amount per unit, qty required (from sales order: qty per unit * no of units in sales order), qty in inventory (inventory stock for raw material item), Total Cost (qty required * amount per unit) 
+
+--------------------------------------------------------------------------------------------
+After a Work Order is generated, we mark the raw material quantity in inventory as "unrealised reservation". That means, if we get an order for 
+1000 HS1, each requiring 2 filaments, we need 2000 filament for this order. In inventory, lets say we have 2000 filament. So we generate a work order for this. 
+Now, the stock inventory for this order should mark 2000 filament as an unrealised reservation against this Work order. If we later get an new order for HS1, on the new
+work order generation page, we show 2000 filament available, but mark it as unrealised reserved quantity prompting user to order more filament. User can still generate more work orders
+against this stock.
+--------------------------------------------------------------------------------------------
+the work order details page:
+
+Sales Order No.: <corresponding sales order no.> <clickable and takes to sales order details page>
+Created on:
+Created by:
+
+Item: <Underlying item>
+Total Order Qty: <A>
+Qty Shipped: <B>
+Qty Ready to ship: <C>             <button>Add to ready to ship</button>
+Balance Qty: (A-B-C)
+
+This is the master that all other orders refer to. Now, a sales order is created. Against each item in the sales order, a work order is created.
+On the Sales order details page, we have a button to generate a work order.
+Look at SO-2026-00001, we will now create a work order WO-2026-00001-001.
+Here we have H4, H7, H11 and H4-LED. So we can have 4+ Work orders (no min). That means work order for Finished good like H4 and for semi-Finished goods in BOM of H4. 
+
+Now on the sales order page, we display qty available. This is quantity in stock. So on Sales order page, we need a button on top "Create Sales Invoice" next to create work order button. 

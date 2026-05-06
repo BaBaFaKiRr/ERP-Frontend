@@ -153,7 +153,7 @@ export default function CreatePurchaseOrderPage() {
           <ArrowLeft size={18} />
           Back
         </Button>
-        <h1 className="text-4xl font-bold text-gray-900">Create Purchase Order</h1>
+        <h1 className="text-4xl font-bold text-gray-900 dark:text-white">Create Purchase Order</h1>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-6">

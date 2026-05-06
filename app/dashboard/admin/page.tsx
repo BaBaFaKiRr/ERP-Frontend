@@ -15,7 +15,7 @@ export default function AdminPage() {
     <div className="p-8">
       <div className="flex justify-between items-start mb-8">
         <div>
-          <h1 className="text-4xl font-bold text-gray-900">Admin Panel</h1>
+          <h1 className="text-4xl font-bold text-gray-900 dark:text-white">Admin Panel</h1>
           <p className="text-gray-600 mt-2">System administration and configuration</p>
         </div>
       </div>
