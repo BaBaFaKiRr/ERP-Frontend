@@ -28,7 +28,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
-import { ArrowLeft, FileText, Trash2 } from 'lucide-react'
+import { ArrowLeft, ChevronDown, ChevronRight, FileText, Trash2 } from 'lucide-react'
 import { erpFetch } from '@/lib/erp-api'
 import { cn } from '@/lib/utils'
 
@@ -55,6 +55,9 @@ type SalesOrderDetail = {
   deleted_at?: string | null
   customers?: { name: string; email?: string | null; phone?: string | null } | null
   sales_order_lines?: LineRow[] | null
+  po_number?: string | null
+  po_file_path?: string | null
+  po_file_name?: string | null
 }
 
 type WoLine = { item_id: string; qty_ordered: number; qty_shipped?: number }
@@ -69,6 +72,25 @@ type WorkOrderRow = {
 type InventoryBalance = {
   item_id: string
   qty_on_hand: number
+}
+
+type DispatchSalesInvoice = {
+  id: string
+  invoice_number: string
+  dispatch_order_id: string
+  dispatch_orders?: { do_number?: string | null } | null
+  status: 'active' | 'cancelled'
+  created_at: string
+}
+
+type SentDispatchOrder = {
+  id: string
+  sales_order_id: string
+  status: string
+  dispatch_order_lines?: Array<{
+    sales_order_line_id?: string | null
+    qty_to_dispatch?: number | null
+  }> | null
 }
 
 const statusLabel: Record<string, string> = {
@@ -93,6 +115,11 @@ const workOrderStatusLabel: Record<string, string> = {
   cancelled: 'Cancelled',
 }
 
+function invoiceFamilyKey(invoiceNumber: string): string {
+  const m = invoiceNumber.match(/^(.*)-\d{3}$/)
+  return m?.[1] ?? invoiceNumber
+}
+
 export default function SalesOrderDetailPage() {
   const params = useParams()
   const router = useRouter()
@@ -108,6 +135,19 @@ export default function SalesOrderDetailPage() {
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [workOrders, setWorkOrders] = useState<WorkOrderRow[]>([])
   const [inventoryMap, setInventoryMap] = useState<Record<string, number>>({})
+  const [salesInvoices, setSalesInvoices] = useState<DispatchSalesInvoice[]>([])
+  const [dispatchShippedBySoLine, setDispatchShippedBySoLine] = useState<Record<string, number>>({})
+  const [expandedInvoiceFamilies, setExpandedInvoiceFamilies] = useState<Record<string, boolean>>({})
+
+  const openPoPreview = async () => {
+    if (!order?.id || !order.po_number) return
+    try {
+      const res = await erpFetch<{ data: { signed_url: string } }>(`/api/sales-orders/${order.id}/purchase-order-url`)
+      if (res.data?.signed_url) window.open(res.data.signed_url, '_blank', 'noopener,noreferrer')
+    } catch (e) {
+      alert(e instanceof Error ? e.message : 'Failed to open purchase order')
+    }
+  }
 
   const loadOrder = useCallback(async () => {
     if (!id) return
@@ -127,17 +167,33 @@ export default function SalesOrderDetailPage() {
   const loadAux = useCallback(async () => {
     if (!id) return
     try {
-      const [woRes, invRes] = await Promise.all([
+      const [woRes, invRes, siRes, dispatchRes] = await Promise.all([
         erpFetch<{ data: WorkOrderRow[] }>(`/api/work-orders?sales_order_id=${id}`),
         erpFetch<{ data: InventoryBalance[] }>('/api/inventory/balances'),
+        erpFetch<{ data: DispatchSalesInvoice[] }>(`/api/dispatch-sales-invoices?sales_order_id=${id}`),
+        erpFetch<{ data: SentDispatchOrder[] }>('/api/dispatch/orders'),
       ])
       setWorkOrders(woRes.data ?? [])
       const m: Record<string, number> = {}
       for (const b of invRes.data ?? []) m[b.item_id] = Number(b.qty_on_hand ?? 0)
       setInventoryMap(m)
+      setSalesInvoices(siRes.data ?? [])
+      const shippedMap: Record<string, number> = {}
+      for (const d of dispatchRes.data ?? []) {
+        if (d.sales_order_id !== id) continue
+        if (!['sent', 'dispatched'].includes(String(d.status))) continue
+        for (const line of d.dispatch_order_lines ?? []) {
+          const soLineId = String(line.sales_order_line_id ?? '')
+          if (!soLineId) continue
+          shippedMap[soLineId] = (shippedMap[soLineId] ?? 0) + Number(line.qty_to_dispatch ?? 0)
+        }
+      }
+      setDispatchShippedBySoLine(shippedMap)
     } catch {
       setWorkOrders([])
       setInventoryMap({})
+      setSalesInvoices([])
+      setDispatchShippedBySoLine({})
     }
   }, [id])
 
@@ -243,6 +299,8 @@ export default function SalesOrderDetailPage() {
   const grandTotal = Math.round((subTotal + gstAmount) * 100) / 100
 
   const qtyShippedForSoLine = (lineId: string, itemId: string) => {
+    const dispatchQty = Number(dispatchShippedBySoLine[lineId] ?? 0)
+    if (dispatchQty > 0) return dispatchQty
     let s = 0
     for (const wo of workOrders) {
       if (wo.sales_order_line_id !== lineId) continue
@@ -252,6 +310,29 @@ export default function SalesOrderDetailPage() {
     }
     return s
   }
+
+  const salesInvoiceGroups = (() => {
+    const families = new Map<string, DispatchSalesInvoice[]>()
+    for (const row of salesInvoices) {
+      const key = invoiceFamilyKey(row.invoice_number)
+      const existing = families.get(key) ?? []
+      existing.push(row)
+      families.set(key, existing)
+    }
+    const groups = Array.from(families.entries()).map(([key, rows]) => ({
+      key,
+      rows: rows
+        .slice()
+        .sort((a, b) => a.invoice_number.localeCompare(b.invoice_number, undefined, { numeric: true })),
+      latestCreatedAt: rows
+        .slice()
+        .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0]?.created_at,
+    }))
+    return groups.sort(
+      (a, b) =>
+        new Date(b.latestCreatedAt ?? 0).getTime() - new Date(a.latestCreatedAt ?? 0).getTime(),
+    )
+  })()
 
   return (
     <div className={cn('p-8 max-w-4xl', order.status === 'deleted' && 'opacity-80')}>
@@ -392,6 +473,16 @@ export default function SalesOrderDetailPage() {
               </p>
             </div>
             <div>
+              <p className="text-muted-foreground">PO Number</p>
+              {order.po_number ? (
+                <button type="button" className="font-medium text-blue-600 hover:underline" onClick={() => void openPoPreview()}>
+                  {order.po_number}
+                </button>
+              ) : (
+                <p className="font-medium">—</p>
+              )}
+            </div>
+            <div>
               <p className="text-muted-foreground">Delivery date</p>
               <p className="font-medium">
                 {order.delivery_date
@@ -417,6 +508,75 @@ export default function SalesOrderDetailPage() {
               <div className="sm:col-span-2">
                 <p className="text-muted-foreground">Notes</p>
                 <p className="font-medium whitespace-pre-wrap">{order.notes}</p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Sales Invoices</CardTitle>
+            <CardDescription>Invoices generated against dispatch orders for this sales order.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {salesInvoices.length === 0 ? (
+              <p className="text-sm text-muted-foreground">No sales invoices generated yet.</p>
+            ) : (
+              <div className="space-y-2">
+                {salesInvoiceGroups.map((group) => {
+                  const isFamily = group.rows.length > 1
+                  const expanded = Boolean(expandedInvoiceFamilies[group.key])
+                  const first = group.rows[0]
+                  return (
+                    <div key={group.key} className="rounded-md border border-border/70">
+                      <button
+                        type="button"
+                        disabled={!isFamily}
+                        onClick={() =>
+                          isFamily
+                            ? setExpandedInvoiceFamilies((prev) => ({
+                                ...prev,
+                                [group.key]: !prev[group.key],
+                              }))
+                            : undefined
+                        }
+                        className="flex w-full items-center justify-between gap-2 p-3 text-left hover:bg-muted/40"
+                      >
+                        <span className="flex items-center gap-2">
+                          {isFamily ? (
+                            expanded ? <ChevronDown className="size-4 text-muted-foreground" /> : <ChevronRight className="size-4 text-muted-foreground" />
+                          ) : (
+                            <span className="inline-block w-4" />
+                          )}
+                          <span className="font-mono">
+                            {isFamily ? `${group.key}-...` : first.invoice_number}
+                          </span>
+                        </span>
+                        <span className="text-xs text-muted-foreground">{group.rows.length} item(s)</span>
+                      </button>
+
+                      {isFamily && expanded ? (
+                        <div className="space-y-1 border-t p-2">
+                          {group.rows.map((inv) => (
+                            <div key={inv.id} className="rounded border p-2">
+                              <Link href={`/dashboard/finance/sales-invoices/${inv.id}`} className="font-mono text-blue-600 hover:underline">
+                                {inv.invoice_number}
+                              </Link>
+                              <div className="mt-1 flex items-center justify-between text-sm">
+                                <Link href={`/dashboard/finance/invoice-requests/${inv.dispatch_order_id}`} className="text-blue-600 hover:underline">
+                                  {inv.dispatch_orders?.do_number ?? '—'}
+                                </Link>
+                                <span className={inv.status === 'active' ? 'text-green-600 font-semibold' : 'text-red-600 font-semibold'}>
+                                  {inv.status === 'active' ? 'Active' : 'Cancelled'}
+                                </span>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      ) : null}
+                    </div>
+                  )
+                })}
               </div>
             )}
           </CardContent>

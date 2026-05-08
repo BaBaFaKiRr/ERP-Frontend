@@ -47,6 +47,15 @@ const MANUFACTURING_CHILDREN = [
 const ACCOUNTS_CHILDREN = [
   { name: 'Overview', href: '/dashboard/finance' },
   { name: 'Invoice Requests', href: '/dashboard/finance/invoice-requests' },
+  { name: 'Sales Invoices', href: '/dashboard/finance/sales-invoices' },
+  { name: 'Settings', href: '/dashboard/finance/settings' },
+] as const
+
+const PURCHASE_CHILDREN = [
+  { name: 'Overview', href: '/dashboard/purchase' },
+  { name: 'Purchase Orders', href: '/dashboard/purchase/orders' },
+  { name: 'Suppliers', href: '/dashboard/purchase/suppliers' },
+  { name: 'Settings', href: '/dashboard/purchase/settings' },
 ] as const
 
 function inventoryChildActive(pathname: string, href: (typeof INVENTORY_CHILDREN)[number]['href']) {
@@ -76,7 +85,6 @@ function inventoryChildActive(pathname: string, href: (typeof INVENTORY_CHILDREN
 
 const navigationAfterInventory = [
   { name: 'Sales Orders', href: '/dashboard/sales', icon: ShoppingCart },
-  { name: 'Purchase Orders', href: '/dashboard/purchase', icon: Package2 },
   { name: 'Dispatch', href: '/dashboard/dispatch', icon: Truck },
   { name: 'HR & Employees', href: '/dashboard/hr', icon: Users },
   { name: 'Admin', href: '/dashboard/admin', icon: Settings },
@@ -236,7 +244,9 @@ function ManufacturingSidebarSection({ sidebarOpen }: { sidebarOpen: boolean }) 
 
 function accountsChildActive(pathname: string, href: (typeof ACCOUNTS_CHILDREN)[number]['href']) {
   if (href === '/dashboard/finance') return pathname === '/dashboard/finance'
-  return pathname.startsWith('/dashboard/finance/invoice-requests')
+  if (href === '/dashboard/finance/invoice-requests') return pathname.startsWith('/dashboard/finance/invoice-requests')
+  if (href === '/dashboard/finance/sales-invoices') return pathname.startsWith('/dashboard/finance/sales-invoices')
+  return pathname.startsWith('/dashboard/finance/settings')
 }
 
 function AccountsSidebarSection({ sidebarOpen }: { sidebarOpen: boolean }) {
@@ -286,6 +296,82 @@ function AccountsSidebarSection({ sidebarOpen }: { sidebarOpen: boolean }) {
         <div className="mt-1 space-y-1 border-l border-slate-200 ml-6 pl-2 mr-2 py-1 dark:border-white/15">
           {ACCOUNTS_CHILDREN.map((child) => {
             const active = accountsChildActive(pathname, child.href)
+            return (
+              <Link
+                key={child.href}
+                href={child.href}
+                className={cn(
+                  'block rounded-lg px-3 py-2 text-sm transition-colors',
+                  active
+                    ? 'bg-slate-100 text-app-nav-text font-medium dark:bg-white/10'
+                    : 'text-app-nav-text-muted hover:text-app-nav-text hover:bg-slate-100 dark:hover:bg-white/10',
+                )}
+              >
+                {child.name}
+              </Link>
+            )
+          })}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function purchaseChildActive(pathname: string, href: (typeof PURCHASE_CHILDREN)[number]['href']) {
+  if (href === '/dashboard/purchase') return pathname === '/dashboard/purchase'
+  if (href === '/dashboard/purchase/orders') return pathname.startsWith('/dashboard/purchase/orders')
+  if (href === '/dashboard/purchase/suppliers') return pathname.startsWith('/dashboard/purchase/suppliers')
+  if (href === '/dashboard/purchase/settings') return pathname.startsWith('/dashboard/purchase/settings')
+  return href === '/dashboard/purchase/orders' && pathname.startsWith('/dashboard/purchase/create')
+}
+
+function PurchaseSidebarSection({ sidebarOpen }: { sidebarOpen: boolean }) {
+  const pathname = usePathname()
+  const underPurchase = pathname.startsWith('/dashboard/purchase')
+  const [expanded, setExpanded] = useState(underPurchase)
+
+  useEffect(() => {
+    if (underPurchase) setExpanded(true)
+  }, [underPurchase])
+
+  if (!sidebarOpen) {
+    return (
+      <Link
+        href="/dashboard/purchase"
+        className={cn(
+          'text-app-nav-text-muted hover:text-app-nav-text flex items-center justify-center rounded-xl p-3 transition-colors hover:bg-slate-100 dark:hover:bg-white/10',
+          underPurchase && 'bg-slate-100 text-app-nav-text dark:bg-white/10',
+        )}
+        title="Purchase"
+      >
+        <Package2 size={20} />
+      </Link>
+    )
+  }
+
+  return (
+    <div className="mb-1">
+      <button
+        type="button"
+        onClick={() => setExpanded((e) => !e)}
+        className={cn(
+          'text-app-nav-text-muted hover:text-app-nav-text flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition-colors hover:bg-slate-100 dark:hover:bg-white/10',
+          underPurchase && 'bg-slate-100 text-app-nav-text dark:bg-white/10',
+        )}
+        aria-expanded={expanded}
+      >
+        <Package2 size={20} className="shrink-0" />
+        <span className="flex-1 font-medium">Purchase</span>
+        {expanded ? (
+          <ChevronDown size={18} className="shrink-0 opacity-80" />
+        ) : (
+          <ChevronRight size={18} className="shrink-0 opacity-80" />
+        )}
+      </button>
+      {expanded && (
+        <div className="mt-1 space-y-1 border-l border-slate-200 ml-6 pl-2 mr-2 py-1 dark:border-white/15">
+          {PURCHASE_CHILDREN.map((child) => {
+            const active = purchaseChildActive(pathname, child.href)
             return (
               <Link
                 key={child.href}
@@ -369,6 +455,7 @@ export default function DashboardLayout({
           <InventorySidebarSection sidebarOpen={sidebarOpen} />
           <ManufacturingSidebarSection sidebarOpen={sidebarOpen} />
           <AccountsSidebarSection sidebarOpen={sidebarOpen} />
+          <PurchaseSidebarSection sidebarOpen={sidebarOpen} />
 
           {navigationAfterInventory.map((item) => (
             <Link

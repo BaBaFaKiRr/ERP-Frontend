@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import {
   Card,
@@ -10,7 +10,6 @@ import {
   CardTitle,
 } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
 import {
   Table,
   TableBody,
@@ -19,30 +18,30 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
-import { Plus, Search } from 'lucide-react'
+import { ArrowRight } from 'lucide-react'
 import { erpFetch } from '@/lib/erp-api'
+
+type InventoryBalanceRow = {
+  item_id: string
+  qty_on_hand: number | null
+  items: {
+    sku: string
+    name: string
+    reorder_level: number | null
+  } | null
+}
 
 type PurchaseOrderRow = {
   id: string
   po_number: string
   status: string
-  order_date?: string | null
-  expected_delivery_date?: string | null
   total_amount?: number | null
-  suppliers?: { name: string } | null
-  purchase_order_lines?: Array<{ id: string }> | null
+  order_date?: string | null
+  suppliers?: { name?: string | null } | null
 }
 
-const statusConfig = {
-  draft: { color: 'bg-gray-100 text-gray-800', label: 'Draft' },
-  pending_approval: { color: 'bg-yellow-100 text-yellow-800', label: 'Pending Approval' },
-  approved: { color: 'bg-blue-100 text-blue-800', label: 'Approved' },
-  completed: { color: 'bg-green-100 text-green-800', label: 'Completed' },
-  cancelled: { color: 'bg-slate-200 text-slate-700', label: 'Cancelled' },
-}
-
-export default function PurchaseOrdersPage() {
-  const [searchTerm, setSearchTerm] = useState('')
+export default function PurchaseOverviewPage() {
+  const [balances, setBalances] = useState<InventoryBalanceRow[]>([])
   const [orders, setOrders] = useState<PurchaseOrderRow[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -55,167 +54,183 @@ export default function PurchaseOrdersPage() {
     setLoading(true)
     setError(null)
     try {
-      const res = await erpFetch<{ data: PurchaseOrderRow[] }>('/api/purchase/orders')
-      setOrders(res.data ?? [])
+      const [balancesRes, ordersRes] = await Promise.all([
+        erpFetch<{ data: InventoryBalanceRow[] }>('/api/inventory/balances'),
+        erpFetch<{ data: PurchaseOrderRow[] }>('/api/purchase/orders'),
+      ])
+      setBalances(balancesRes.data ?? [])
+      setOrders(ordersRes.data ?? [])
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to load purchase orders')
+      setError(e instanceof Error ? e.message : 'Failed to load purchase overview')
     } finally {
       setLoading(false)
     }
   }
 
-  const filteredOrders = orders.filter(
-    (order) =>
-      order.po_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (order.suppliers?.name ?? '').toLowerCase().includes(searchTerm.toLowerCase()),
+  const stockAlerts = useMemo(
+    () =>
+      balances
+        .filter((row) => {
+          if (!row.items) return false
+          const minQty = Number(row.items.reorder_level ?? 0)
+          const stockQty = Number(row.qty_on_hand ?? 0)
+          return minQty > 0 && stockQty < minQty
+        })
+        .sort(
+          (a, b) =>
+            Number(b.items?.reorder_level ?? 0) -
+            Number(b.qty_on_hand ?? 0) -
+            (Number(a.items?.reorder_level ?? 0) - Number(a.qty_on_hand ?? 0)),
+        ),
+    [balances],
   )
 
-  const totalValue = orders.reduce((sum, order) => sum + Number(order.total_amount ?? 0), 0)
-  const approvedOrders = orders.filter((o) => o.status === 'approved').length
-  const pendingOrders = orders.filter((o) => o.status === 'pending_approval').length
+  const recentOrders = useMemo(() => orders.slice(0, 5), [orders])
 
   return (
     <div className="p-8">
       <div className="flex justify-between items-start mb-8">
         <div>
-          <h1 className="text-4xl font-bold text-gray-900 dark:text-white">Purchase Orders</h1>
-          <p className="text-gray-600 mt-2">Manage purchase orders to suppliers</p>
+          <h1 className="text-4xl font-bold text-gray-900 dark:text-white">Purchase</h1>
+          <p className="text-gray-600 mt-2">Overview and quick access to purchase operations</p>
         </div>
-        <Link href="/dashboard/purchase/create">
-          <Button className="flex items-center gap-2">
-            <Plus size={18} />
-            Create Purchase Order
-          </Button>
-        </Link>
-      </div>
-
-      {error && <p className="mb-4 text-sm text-red-600">{error}</p>}
-
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">Total POs</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{orders.length}</div>
-            <p className="text-xs text-gray-600">All time</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">Approved POs</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-blue-600">{approvedOrders}</div>
-            <p className="text-xs text-gray-600">Ready for delivery</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">Pending Approval</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-yellow-600">{pendingOrders}</div>
-            <p className="text-xs text-gray-600">Awaiting approval</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">Total Value</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">₹{totalValue.toLocaleString('en-IN')}</div>
-            <p className="text-xs text-gray-600">Purchase value</p>
-          </CardContent>
-        </Card>
       </div>
 
       <Card className="mb-8">
         <CardHeader>
-          <CardTitle>Purchase Order Process</CardTitle>
-          <CardDescription>
-            Material request → Create PO → Admin Approval → Send to Supplier → Receive Goods
-          </CardDescription>
+          <CardTitle>Purchase Overview</CardTitle>
+          <CardDescription>Monitor stock alerts and latest purchase orders</CardDescription>
         </CardHeader>
+        <CardContent>
+          <p className="text-sm text-gray-600 dark:text-gray-300">
+            This page now surfaces low-stock alerts and recent purchase order activity.
+          </p>
+        </CardContent>
       </Card>
+
+      {error && <p className="mb-4 text-sm text-red-600">{error}</p>}
+
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 mb-8">
+        <Card>
+          <CardHeader>
+            <CardTitle>Stock Alerts</CardTitle>
+            <CardDescription>Items below reorder warning</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>SKU</TableHead>
+                    <TableHead>Item Name</TableHead>
+                    <TableHead className="text-right">Qty in Stock</TableHead>
+                    <TableHead className="text-right">Min Qty</TableHead>
+                    <TableHead className="text-right">Qty to Order</TableHead>
+                    <TableHead className="text-right">Action</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {loading ? (
+                    <TableRow>
+                      <TableCell colSpan={6}>Loading…</TableCell>
+                    </TableRow>
+                  ) : stockAlerts.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={6}>No stock alerts right now.</TableCell>
+                    </TableRow>
+                  ) : (
+                    stockAlerts.map((row) => {
+                      const stockQty = Number(row.qty_on_hand ?? 0)
+                      const minQty = Number(row.items?.reorder_level ?? 0)
+                      const qtyToOrder = Math.max(minQty - stockQty, 0)
+
+                      return (
+                        <TableRow key={row.item_id}>
+                          <TableCell className="font-mono">{row.items?.sku ?? '—'}</TableCell>
+                          <TableCell>{row.items?.name ?? '—'}</TableCell>
+                          <TableCell className="text-right">{stockQty}</TableCell>
+                          <TableCell className="text-right">{minQty}</TableCell>
+                          <TableCell className="text-right font-semibold text-amber-600">
+                            {qtyToOrder}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <Link href={`/dashboard/purchase/create?itemId=${row.item_id}&qty=${qtyToOrder}`}>
+                              <Button size="sm" variant="outline">Create PO</Button>
+                            </Link>
+                          </TableCell>
+                        </TableRow>
+                      )
+                    })
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Purchase Orders</CardTitle>
+            <CardDescription>Latest purchase order records</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>PO Number</TableHead>
+                    <TableHead>Supplier</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead className="text-right">Amount</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {loading ? (
+                    <TableRow>
+                      <TableCell colSpan={4}>Loading…</TableCell>
+                    </TableRow>
+                  ) : recentOrders.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={4}>No purchase orders yet.</TableCell>
+                    </TableRow>
+                  ) : (
+                    recentOrders.map((order) => (
+                      <TableRow key={order.id}>
+                        <TableCell className="font-mono">{order.po_number}</TableCell>
+                        <TableCell>{order.suppliers?.name ?? '—'}</TableCell>
+                        <TableCell className="capitalize">{order.status.replace(/_/g, ' ')}</TableCell>
+                        <TableCell className="text-right">
+                          {order.total_amount != null ? `₹${Number(order.total_amount).toFixed(2)}` : '—'}
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
 
       <Card>
         <CardHeader>
-          <CardTitle>Purchase Orders</CardTitle>
-          <CardDescription>Search and manage purchase orders</CardDescription>
+          <CardTitle>Quick Actions</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="mb-6 flex gap-4">
-            <div className="flex-1 relative">
-              <Search className="absolute left-3 top-3 text-gray-400" size={18} />
-              <Input
-                placeholder="Search by PO number or supplier..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10"
-              />
-            </div>
+          <div className="flex gap-3">
+            <Link href="/dashboard/purchase/orders">
+              <Button className="flex items-center gap-2">
+                <span>Open Purchase Orders</span>
+                <ArrowRight size={16} />
+              </Button>
+            </Link>
             <Button type="button" variant="outline" onClick={() => void load()}>
-              Refresh
+              Refresh Widgets
             </Button>
           </div>
-
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow className="bg-gray-50">
-                  <TableHead>PO Number</TableHead>
-                  <TableHead>Supplier</TableHead>
-                  <TableHead>Order Date</TableHead>
-                  <TableHead>Expected Date</TableHead>
-                  <TableHead className="text-right">Amount (INR)</TableHead>
-                  <TableHead>Items</TableHead>
-                  <TableHead>Status</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {loading ? (
-                  <TableRow>
-                    <TableCell colSpan={7}>Loading…</TableCell>
-                  </TableRow>
-                ) : filteredOrders.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={7}>No purchase orders found.</TableCell>
-                  </TableRow>
-                ) : (
-                  filteredOrders.map((order) => (
-                    <TableRow key={order.id} className="hover:bg-gray-50">
-                      <TableCell className="font-mono font-semibold">{order.po_number}</TableCell>
-                      <TableCell>{order.suppliers?.name ?? '—'}</TableCell>
-                      <TableCell>
-                        {order.order_date ? new Date(order.order_date).toLocaleDateString('en-GB') : '—'}
-                      </TableCell>
-                      <TableCell>
-                        {order.expected_delivery_date
-                          ? new Date(order.expected_delivery_date).toLocaleDateString('en-GB')
-                          : '—'}
-                      </TableCell>
-                      <TableCell className="text-right font-semibold">
-                        {order.total_amount != null ? `₹${Number(order.total_amount).toFixed(2)}` : '—'}
-                      </TableCell>
-                      <TableCell>{order.purchase_order_lines?.length ?? 0}</TableCell>
-                      <TableCell>
-                        <span
-                          className={`text-xs px-3 py-1 rounded-full ${
-                            statusConfig[order.status as keyof typeof statusConfig]?.color ??
-                            'bg-gray-100 text-gray-800'
-                          }`}
-                        >
-                          {statusConfig[order.status as keyof typeof statusConfig]?.label ??
-                            order.status}
-                        </span>
-                      </TableCell>
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          </div>
+          <p className="mt-3 text-xs text-gray-500 dark:text-gray-400">
+            Purchase Orders continues to use the existing PO management screen.
+          </p>
         </CardContent>
       </Card>
     </div>

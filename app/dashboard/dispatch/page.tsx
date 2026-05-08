@@ -1,29 +1,26 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { erpFetch } from '@/lib/erp-api'
 
-type DispatchSalesOrder = {
+type DispatchOrder = {
   id: string
-  order_number?: string | null
+  do_number?: string | null
+  sales_order_id: string
+  sales_order_number?: string | null
+  customer_name?: string | null
   status: string
-  order_date?: string | null
-  customers?: { name?: string | null } | null
-  sales_order_lines?: Array<{ id: string; quantity?: number | null }> | null
+  created_at: string
+  dispatch_order_lines?: Array<{ id: string }>
 }
 
-const DISPATCH_ALLOWED_STATUSES = new Set([
-  'approved',
-  'pending_work_order',
-  'work_order_open',
-  'in_progress',
-  'partially_shipped',
-])
-
 function statusLabel(status: string): string {
+  if (status === 'rejected_by_admin') return 'Rejected by Admin'
+  if (status === 'waiting_to_dispatch') return 'Waiting To Dispatch'
+  if (status === 'sent') return 'Sent'
   return status
     .split('_')
     .filter(Boolean)
@@ -33,7 +30,7 @@ function statusLabel(status: string): string {
 
 export default function DispatchPage() {
   const router = useRouter()
-  const [rows, setRows] = useState<DispatchSalesOrder[]>([])
+  const [rows, setRows] = useState<DispatchOrder[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -42,7 +39,7 @@ export default function DispatchPage() {
       setLoading(true)
       setError(null)
       try {
-        const res = await erpFetch<{ data: DispatchSalesOrder[] }>('/api/sales-orders')
+        const res = await erpFetch<{ data: DispatchOrder[] }>('/api/dispatch/orders')
         setRows(res.data ?? [])
       } catch (e) {
         setError(e instanceof Error ? e.message : 'Failed to load dispatch orders')
@@ -52,57 +49,65 @@ export default function DispatchPage() {
     })()
   }, [])
 
-  const dispatchRows = useMemo(
-    () => rows.filter((r) => DISPATCH_ALLOWED_STATUSES.has(String(r.status ?? ''))),
-    [rows],
-  )
-
   return (
     <div className="p-6 md:p-8">
       <Card>
         <CardHeader>
           <CardTitle>Dispatch</CardTitle>
           <CardDescription>
-            Sales orders ready for dispatch workflow: approved, pending_work_order, work_order_open,
-            in_progress, partially_shipped.
+            All generated dispatch orders and their current status.
           </CardDescription>
         </CardHeader>
         <CardContent>
-          {loading ? <p className="text-sm text-muted-foreground">Loading sales orders...</p> : null}
+          {loading ? <p className="text-sm text-muted-foreground">Loading dispatch orders...</p> : null}
           {error ? <p className="text-sm text-red-600">{error}</p> : null}
-          {!loading && !error && dispatchRows.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No sales orders in dispatch statuses.</p>
+          {!loading && !error && rows.length === 0 ? (
+            <p className="text-sm text-muted-foreground">No dispatch orders found.</p>
           ) : null}
-          {dispatchRows.length > 0 ? (
+          {rows.length > 0 ? (
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="text-left border-b">
-                    <th className="py-2 pr-3">SO Number</th>
+                    <th className="py-2 pr-3">Dispatch Order</th>
+                    <th className="py-2 pr-3">Sales Order</th>
                     <th className="py-2 pr-3">Customer</th>
-                    <th className="py-2 pr-3">Order Date</th>
+                    <th className="py-2 pr-3">Created On</th>
                     <th className="py-2 pr-3">Lines</th>
                     <th className="py-2 pr-3">Status</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {dispatchRows.map((row) => (
+                  {rows.map((row) => (
                     <tr
                       key={row.id}
                       className="border-b cursor-pointer hover:bg-muted/40"
-                      onClick={() => router.push(`/dashboard/dispatch/${row.id}`)}
+                      onClick={() => router.push(`/dashboard/finance/invoice-requests/${row.id}`)}
                     >
                       <td className="py-2 pr-3 font-mono">
-                        <Link className="hover:underline" href={`/dashboard/dispatch/${row.id}`} onClick={(e) => e.stopPropagation()}>
-                          {row.order_number ?? row.id.slice(0, 8)}
+                        <Link className="hover:underline" href={`/dashboard/finance/invoice-requests/${row.id}`} onClick={(e) => e.stopPropagation()}>
+                          {row.do_number ?? '—'}
                         </Link>
                       </td>
-                      <td className="py-2 pr-3">{row.customers?.name ?? '-'}</td>
                       <td className="py-2 pr-3">
-                        {row.order_date ? new Date(row.order_date).toLocaleDateString('en-IN') : '-'}
+                        <Link className="hover:underline" href={`/dashboard/sales/${row.sales_order_id}`} onClick={(e) => e.stopPropagation()}>
+                          {row.sales_order_number ?? '—'}
+                        </Link>
                       </td>
-                      <td className="py-2 pr-3">{(row.sales_order_lines ?? []).length}</td>
-                      <td className="py-2 pr-3">{statusLabel(String(row.status ?? ''))}</td>
+                      <td className="py-2 pr-3">{row.customer_name ?? '-'}</td>
+                      <td className="py-2 pr-3">{new Date(row.created_at).toLocaleString('en-IN')}</td>
+                      <td className="py-2 pr-3">{(row.dispatch_order_lines ?? []).length}</td>
+                      <td className="py-2 pr-3">
+                        <span
+                          className={
+                            row.status === 'rejected_by_admin'
+                              ? 'text-red-600 text-xl font-semibold'
+                              : ''
+                          }
+                        >
+                          {statusLabel(String(row.status ?? ''))}
+                        </span>
+                      </td>
                     </tr>
                   ))}
                 </tbody>

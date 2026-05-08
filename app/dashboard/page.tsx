@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { erpFetch } from '@/lib/erp-api'
 import {
@@ -22,6 +23,10 @@ export default function DashboardPage() {
     activeWorkOrders: 0,
     purchasePendingApprovals: 0,
   })
+  const [me, setMe] = useState<{ role: string } | null>(null)
+  const [dispatchPendingRows, setDispatchPendingRows] = useState<
+    Array<{ id: string; do_number?: string | null; customer_name?: string | null; created_at: string }>
+  >([])
 
   useEffect(() => {
     const getUser = async () => {
@@ -29,6 +34,12 @@ export default function DashboardPage() {
         data: { user },
       } = await supabase.auth.getUser()
       setUser(user)
+      try {
+        const meRes = await erpFetch<{ user: { role: string } }>('/api/me')
+        setMe(meRes.user ?? null)
+      } catch {
+        setMe(null)
+      }
     }
 
     getUser()
@@ -57,13 +68,19 @@ export default function DashboardPage() {
           purchasePendingApprovals: purchaseOrders.filter((p) => p.status === 'pending_approval')
             .length,
         })
+        if (me?.role === 'admin') {
+          const dispatchRes = await erpFetch<{ data: Array<{ id: string; do_number?: string | null; customer_name?: string | null; created_at: string }> }>(
+            '/api/dispatch/orders?status=awaiting_approval',
+          )
+          setDispatchPendingRows(dispatchRes.data ?? [])
+        }
       } catch (e) {
         setError(e instanceof Error ? e.message : 'Failed to load dashboard')
       } finally {
         setLoading(false)
       }
     })()
-  }, [])
+  }, [me?.role])
 
   return (
     <div className="p-6 md:p-8">
@@ -155,6 +172,34 @@ export default function DashboardPage() {
             </div>
           </CardContent>
         </Card>
+
+        {me?.role === 'admin' ? (
+          <Card className="border-border/70 bg-card/70 backdrop-blur-sm">
+            <CardHeader>
+              <CardTitle className="text-lg">Pending Approval</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {dispatchPendingRows.length === 0 ? (
+                <p className="text-sm text-muted-foreground">No dispatch orders pending approval.</p>
+              ) : (
+                <div className="space-y-2">
+                  {dispatchPendingRows.map((row) => (
+                    <Link
+                      key={row.id}
+                      href={`/dashboard/finance/invoice-requests/${row.id}`}
+                      className="block rounded-md border p-3 hover:bg-muted/40"
+                    >
+                      <p className="font-mono text-sm">{row.do_number ?? '—'}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {row.customer_name ?? '-'} • {new Date(row.created_at).toLocaleString('en-IN')}
+                      </p>
+                    </Link>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        ) : null}
       </div>
     </div>
   )

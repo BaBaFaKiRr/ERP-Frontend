@@ -88,14 +88,14 @@ export default function InvoiceRequestsPage() {
                       className="border-b cursor-pointer hover:bg-muted/40"
                       onClick={() => router.push(`/dashboard/finance/invoice-requests/${row.id}`)}
                     >
-                      <td className="py-2 pr-3 font-mono">{row.do_number ?? row.id.slice(0, 8)}</td>
+                      <td className="py-2 pr-3 font-mono">{row.do_number ?? '—'}</td>
                       <td className="py-2 pr-3">
                         <Link
                           className="hover:underline"
                           href={`/dashboard/sales/${row.sales_order_id}`}
                           onClick={(e) => e.stopPropagation()}
                         >
-                          {row.sales_order_number ?? row.sales_order_id.slice(0, 8)}
+                          {row.sales_order_number ?? '—'}
                         </Link>
                       </td>
                       <td className="py-2 pr-3">{row.customer_name ?? '-'}</td>

@@ -36,6 +36,6 @@ Against Work Orders: (Search bar displaying all open work orders, multi selectio
 Material Table:
 Work Order No.:
     Item: H4
-    BOM: H4 Capsule:
+    BOM: H4 Capsule:b
 
 

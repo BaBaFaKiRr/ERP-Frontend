@@ -133,6 +133,8 @@ function CreateSalesOrderForm() {
   const customerWrapRef = useRef<HTMLDivElement>(null)
   const [orderDate, setOrderDate] = useState(() => todayLocalYmd())
   const [deliveryDate, setDeliveryDate] = useState('')
+  const [poNumber, setPoNumber] = useState('')
+  const [poFile, setPoFile] = useState<File | null>(null)
   const [lines, setLines] = useState<OrderLineRow[]>([])
   const { min: orderDateMin, max: orderDateMax } = orderDateBounds()
 
@@ -315,6 +317,10 @@ function CreateSalesOrderForm() {
       alert('Search and select a customer, and add at least one line')
       return
     }
+    if (poFile && !poNumber.trim()) {
+      alert('PO number is required when you upload a purchase order file')
+      return
+    }
 
     if (!isOrderDateAllowed(orderDate)) {
       alert('Order date must be today or up to 7 days in the past, and not in the future.')
@@ -349,7 +355,7 @@ function CreateSalesOrderForm() {
     setLoading(true)
 
     try {
-      await erpFetch('/api/sales-orders', {
+      const created = await erpFetch<{ data: { id: string } }>('/api/sales-orders', {
         method: 'POST',
         body: JSON.stringify({
           customer_id: pickedCustomer.id,
@@ -358,6 +364,16 @@ function CreateSalesOrderForm() {
           lines: payloadLines,
         }),
       })
+
+      if (poFile && created?.data?.id) {
+        const form = new FormData()
+        form.append('po_number', poNumber.trim())
+        form.append('po_file', poFile)
+        await erpFetch(`/api/sales-orders/${created.data.id}/purchase-order`, {
+          method: 'POST',
+          body: form,
+        })
+      }
 
       router.push('/dashboard/sales')
     } catch (error) {
@@ -425,6 +441,31 @@ function CreateSalesOrderForm() {
                   value={deliveryDate}
                   onChange={(e) => setDeliveryDate(e.target.value)}
                 />
+              </div>
+              <div>
+                <Label htmlFor="po-number" className="mb-1 block">
+                  Purchase Order Number (optional)
+                </Label>
+                <Input
+                  id="po-number"
+                  value={poNumber}
+                  onChange={(e) => setPoNumber(e.target.value)}
+                  placeholder="Enter PO number if uploading PO"
+                />
+              </div>
+              <div className="sm:col-span-2">
+                <Label htmlFor="po-file" className="mb-1 block">
+                  Upload Purchase Order (optional)
+                </Label>
+                <Input
+                  id="po-file"
+                  type="file"
+                  accept=".pdf,.png,.jpg,.jpeg,.webp"
+                  onChange={(e) => setPoFile(e.target.files?.[0] ?? null)}
+                />
+                <p className="text-xs text-muted-foreground mt-1.5">
+                  If PO file is uploaded, PO number is required.
+                </p>
               </div>
             </div>
 
