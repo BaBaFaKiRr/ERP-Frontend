@@ -222,13 +222,13 @@ CREATE TABLE sale_invoices (
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- Purchase Invoices table
-CREATE TABLE purchase_invoices (
+-- Purchase Receipts table
+CREATE TABLE purchase_receipts (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  invoice_number TEXT UNIQUE NOT NULL,
+  receipt_number TEXT UNIQUE NOT NULL,
   purchase_order_id UUID NOT NULL REFERENCES purchase_orders(id),
   supplier_id UUID NOT NULL REFERENCES suppliers(id),
-  invoice_date TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  receipt_date TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   due_date TIMESTAMP WITH TIME ZONE,
   status invoice_status DEFAULT 'draft',
   subtotal DECIMAL(15, 2) DEFAULT 0,
@@ -315,8 +315,8 @@ CREATE INDEX idx_material_entries_work_order ON material_entries(work_order_id);
 CREATE INDEX idx_material_entries_status ON material_entries(status);
 CREATE INDEX idx_sale_invoices_customer ON sale_invoices(customer_id);
 CREATE INDEX idx_sale_invoices_status ON sale_invoices(status);
-CREATE INDEX idx_purchase_invoices_supplier ON purchase_invoices(supplier_id);
-CREATE INDEX idx_purchase_invoices_status ON purchase_invoices(status);
+CREATE INDEX idx_purchase_receipts_supplier ON purchase_receipts(supplier_id);
+CREATE INDEX idx_purchase_receipts_status ON purchase_receipts(status);
 CREATE INDEX idx_employees_user ON employees(user_id);
 CREATE INDEX idx_attendance_employee ON attendance(employee_id);
 CREATE INDEX idx_stock_movements_inventory ON stock_movements(inventory_id);
@@ -335,7 +335,7 @@ ALTER TABLE purchase_order_items ENABLE ROW LEVEL SECURITY;
 ALTER TABLE work_orders ENABLE ROW LEVEL SECURITY;
 ALTER TABLE material_entries ENABLE ROW LEVEL SECURITY;
 ALTER TABLE sale_invoices ENABLE ROW LEVEL SECURITY;
-ALTER TABLE purchase_invoices ENABLE ROW LEVEL SECURITY;
+ALTER TABLE purchase_receipts ENABLE ROW LEVEL SECURITY;
 ALTER TABLE payments ENABLE ROW LEVEL SECURITY;
 ALTER TABLE employees ENABLE ROW LEVEL SECURITY;
 ALTER TABLE attendance ENABLE ROW LEVEL SECURITY;

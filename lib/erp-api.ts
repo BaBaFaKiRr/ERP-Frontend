@@ -60,9 +60,13 @@ function getBaseUrl(): string {
   return url.replace(/\/$/, '')
 }
 
+type ErpFetchInit = Omit<RequestInit, 'body'> & {
+  body?: BodyInit | object | null
+}
+
 export async function erpFetch<T = unknown>(
   path: string,
-  init: RequestInit = {},
+  init: ErpFetchInit = {},
 ): Promise<T> {
   const supabase = createClient()
   const {

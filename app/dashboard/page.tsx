@@ -11,6 +11,18 @@ import {
   CardTitle,
 } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+
+type PendingPurchaseReceipt = {
+  id: string
+  pr_number: string
+  status: string
+  seller_sales_invoice_number?: string | null
+  total_amount?: number | null
+  uploaded_at?: string | null
+  created_at: string
+  suppliers?: { name?: string | null } | null
+}
 
 export default function DashboardPage() {
   const supabase = createClient()
@@ -27,6 +39,8 @@ export default function DashboardPage() {
   const [dispatchPendingRows, setDispatchPendingRows] = useState<
     Array<{ id: string; do_number?: string | null; customer_name?: string | null; created_at: string }>
   >([])
+  const [pendingPurchaseReceipts, setPendingPurchaseReceipts] = useState<PendingPurchaseReceipt[]>([])
+  const [approvingPurchaseReceiptId, setApprovingPurchaseReceiptId] = useState<string | null>(null)
 
   useEffect(() => {
     const getUser = async () => {
@@ -45,42 +59,62 @@ export default function DashboardPage() {
     getUser()
   }, [supabase])
 
-  useEffect(() => {
-    void (async () => {
-      setLoading(true)
-      setError(null)
-      try {
-        const [salesRes, workRes, purchaseRes] = await Promise.all([
-          erpFetch<{ data: Array<{ status: string }> }>('/api/sales-orders'),
-          erpFetch<{ data: Array<{ status: string }> }>('/api/work-orders'),
-          erpFetch<{ data: Array<{ status: string }> }>('/api/purchase/orders'),
-        ])
+  const loadDashboard = async () => {
+    setLoading(true)
+    setError(null)
+    try {
+      const [salesRes, workRes, purchaseReceiptRes] = await Promise.all([
+        erpFetch<{ data: Array<{ status: string }> }>('/api/sales-orders'),
+        erpFetch<{ data: Array<{ status: string }> }>('/api/work-orders'),
+        erpFetch<{ data: PendingPurchaseReceipt[] }>('/api/purchase/receipts'),
+      ])
 
-        const sales = salesRes.data ?? []
-        const workOrders = workRes.data ?? []
-        const purchaseOrders = purchaseRes.data ?? []
+      const sales = salesRes.data ?? []
+      const workOrders = workRes.data ?? []
+      const purchaseReceipts = purchaseReceiptRes.data ?? []
+      const pendingReceipts = purchaseReceipts.filter((p) => p.status === 'pending_approval')
 
-        setMetrics({
-          totalSalesOrders: sales.length,
-          pendingSalesApprovals: sales.filter((s) => s.status === 'pending_approval').length,
-          activeWorkOrders: workOrders.filter((w) => ['pending', 'in_progress'].includes(w.status))
-            .length,
-          purchasePendingApprovals: purchaseOrders.filter((p) => p.status === 'pending_approval')
-            .length,
-        })
-        if (me?.role === 'admin') {
-          const dispatchRes = await erpFetch<{ data: Array<{ id: string; do_number?: string | null; customer_name?: string | null; created_at: string }> }>(
-            '/api/dispatch/orders?status=awaiting_approval',
-          )
-          setDispatchPendingRows(dispatchRes.data ?? [])
-        }
-      } catch (e) {
-        setError(e instanceof Error ? e.message : 'Failed to load dashboard')
-      } finally {
-        setLoading(false)
+      setMetrics({
+        totalSalesOrders: sales.length,
+        pendingSalesApprovals: sales.filter((s) => s.status === 'pending_approval').length,
+        activeWorkOrders: workOrders.filter((w) => ['pending', 'in_progress'].includes(w.status))
+          .length,
+        purchasePendingApprovals: pendingReceipts.length,
+      })
+      setPendingPurchaseReceipts(me?.role === 'admin' ? pendingReceipts : [])
+
+      if (me?.role === 'admin') {
+        const dispatchRes = await erpFetch<{ data: Array<{ id: string; do_number?: string | null; customer_name?: string | null; created_at: string }> }>(
+          '/api/dispatch/orders?status=awaiting_approval',
+        )
+        setDispatchPendingRows(dispatchRes.data ?? [])
+      } else {
+        setDispatchPendingRows([])
       }
-    })()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to load dashboard')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    void loadDashboard()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [me?.role])
+
+  const approvePurchaseReceipt = async (receiptId: string) => {
+    setApprovingPurchaseReceiptId(receiptId)
+    setError(null)
+    try {
+      await erpFetch(`/api/purchase/receipts/${receiptId}/approve`, { method: 'POST', body: {} })
+      await loadDashboard()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to approve purchase receipt')
+    } finally {
+      setApprovingPurchaseReceiptId(null)
+    }
+  }
 
   return (
     <div className="p-6 md:p-8">
@@ -121,7 +155,7 @@ export default function DashboardPage() {
         <Card className="border-border/70 bg-card/70 backdrop-blur-sm">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">
-              Purchase Pending Approval
+              Purchase Receipt Pending Approval
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -176,7 +210,46 @@ export default function DashboardPage() {
         {me?.role === 'admin' ? (
           <Card className="border-border/70 bg-card/70 backdrop-blur-sm">
             <CardHeader>
-              <CardTitle className="text-lg">Pending Approval</CardTitle>
+              <CardTitle className="text-lg">Purchase Receipts Pending Approval</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {pendingPurchaseReceipts.length === 0 ? (
+                <p className="text-sm text-muted-foreground">No purchase receipts pending approval.</p>
+              ) : (
+                <div className="space-y-2">
+                  {pendingPurchaseReceipts.map((receipt) => (
+                    <div key={receipt.id} className="rounded-md border p-3">
+                      <div className="flex items-start justify-between gap-3">
+                        <Link href={`/dashboard/purchase/receipts/${receipt.id}`} className="min-w-0 hover:underline">
+                          <p className="truncate font-mono text-sm">
+                            {receipt.pr_number}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            {receipt.seller_sales_invoice_number ?? 'No seller invoice number'} • {receipt.suppliers?.name ?? '-'} •{' '}
+                            {receipt.total_amount != null ? `₹${Number(receipt.total_amount).toFixed(2)}` : '—'} •{' '}
+                            {new Date(receipt.uploaded_at ?? receipt.created_at).toLocaleString('en-IN')}
+                          </p>
+                        </Link>
+                        <Button
+                          size="sm"
+                          onClick={() => void approvePurchaseReceipt(receipt.id)}
+                          disabled={approvingPurchaseReceiptId === receipt.id}
+                        >
+                          {approvingPurchaseReceiptId === receipt.id ? 'Approving...' : 'Approve'}
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        ) : null}
+
+        {me?.role === 'admin' ? (
+          <Card className="border-border/70 bg-card/70 backdrop-blur-sm">
+            <CardHeader>
+              <CardTitle className="text-lg">Dispatch Pending Approval</CardTitle>
             </CardHeader>
             <CardContent>
               {dispatchPendingRows.length === 0 ? (

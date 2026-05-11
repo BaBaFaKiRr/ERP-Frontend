@@ -23,10 +23,24 @@ type PurchaseOrderDetail = {
   suppliers?: { id?: string; name?: string | null; supplier_code?: string | null } | null
   purchase_order_lines?: Array<{
     id: string
+    item_id?: string | null
     quantity?: number | null
     unit_price?: number | null
     line_total?: number | null
     items?: { sku?: string | null; name?: string | null } | null
+  }> | null
+  purchase_receipts?: Array<{
+    id: string
+    pr_number?: string | null
+    seller_sales_invoice_number?: string | null
+    status?: string | null
+    total_amount?: number | null
+    received_at?: string | null
+    uploaded_at?: string | null
+    purchase_receipt_lines?: Array<{
+      item_id?: string | null
+      quantity?: number | null
+    }> | null
   }> | null
 }
 
@@ -99,6 +113,19 @@ export default function PurchaseOrderDetailPage() {
   const tax = Math.round(subTotal * 0.18 * 100) / 100
   const grandTotal = Math.round((subTotal + tax) * 100) / 100
 
+  const receivedQtyByItem = useMemo(() => {
+    const quantities = new Map<string, number>()
+    for (const receipt of data?.purchase_receipts ?? []) {
+      if (receipt.status === 'cancelled') continue
+      for (const line of receipt.purchase_receipt_lines ?? []) {
+        const itemId = line.item_id ?? ''
+        if (!itemId) continue
+        quantities.set(itemId, (quantities.get(itemId) ?? 0) + Number(line.quantity ?? 0))
+      }
+    }
+    return quantities
+  }, [data?.purchase_receipts])
+
   if (loading) return <div className="p-8 text-sm text-muted-foreground">Loading purchase order...</div>
   if (error || !data) return <div className="p-8 text-sm text-red-600">{error ?? 'Purchase order not found'}</div>
 
@@ -168,21 +195,30 @@ export default function PurchaseOrderDetailPage() {
                   <TableRow>
                     <TableHead>SKU</TableHead>
                     <TableHead>Item</TableHead>
-                    <TableHead className="text-right">Qty</TableHead>
+                    <TableHead className="text-right">Qty Ordered</TableHead>
+                    <TableHead className="text-right">Qty Received</TableHead>
+                    <TableHead className="text-right">Qty Pending</TableHead>
                     <TableHead className="text-right">Price</TableHead>
                     <TableHead className="text-right">Line Total</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {(data.purchase_order_lines ?? []).map((line) => (
-                    <TableRow key={line.id}>
-                      <TableCell className="font-mono">{line.items?.sku ?? '-'}</TableCell>
-                      <TableCell>{line.items?.name ?? '-'}</TableCell>
-                      <TableCell className="text-right">{Number(line.quantity ?? 0)}</TableCell>
-                      <TableCell className="text-right">₹{Number(line.unit_price ?? 0).toFixed(2)}</TableCell>
-                      <TableCell className="text-right">₹{(Number(line.quantity ?? 0) * Number(line.unit_price ?? 0)).toFixed(2)}</TableCell>
-                    </TableRow>
-                  ))}
+                  {(data.purchase_order_lines ?? []).map((line) => {
+                    const orderedQty = Number(line.quantity ?? 0)
+                    const receivedQty = receivedQtyByItem.get(line.item_id ?? '') ?? 0
+                    const pendingQty = Math.max(orderedQty - receivedQty, 0)
+                    return (
+                      <TableRow key={line.id}>
+                        <TableCell className="font-mono">{line.items?.sku ?? '-'}</TableCell>
+                        <TableCell>{line.items?.name ?? '-'}</TableCell>
+                        <TableCell className="text-right">{orderedQty}</TableCell>
+                        <TableCell className="text-right">{receivedQty}</TableCell>
+                        <TableCell className="text-right">{pendingQty}</TableCell>
+                        <TableCell className="text-right">₹{Number(line.unit_price ?? 0).toFixed(2)}</TableCell>
+                        <TableCell className="text-right">₹{(orderedQty * Number(line.unit_price ?? 0)).toFixed(2)}</TableCell>
+                      </TableRow>
+                    )
+                  })}
                 </TableBody>
               </Table>
               <div className="mt-4 text-right text-sm space-y-1">
@@ -190,6 +226,54 @@ export default function PurchaseOrderDetailPage() {
                 <p>Tax (18%): ₹{tax.toFixed(2)}</p>
                 <p className="font-semibold text-base">Grand Total: ₹{grandTotal.toFixed(2)}</p>
               </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Purchase Receipts</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {(data.purchase_receipts ?? []).length > 0 ? (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>PR Number</TableHead>
+                      <TableHead>Seller Invoice</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Received At</TableHead>
+                      <TableHead className="text-right">Items</TableHead>
+                      <TableHead className="text-right">Amount</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {(data.purchase_receipts ?? []).map((receipt) => (
+                      <TableRow key={receipt.id}>
+                        <TableCell>
+                          <Link href={`/dashboard/purchase/receipts/${receipt.id}`} className="font-mono hover:underline">
+                            {receipt.pr_number ?? receipt.id}
+                          </Link>
+                        </TableCell>
+                        <TableCell>{receipt.seller_sales_invoice_number ?? '-'}</TableCell>
+                        <TableCell>{receipt.status ?? '-'}</TableCell>
+                        <TableCell>
+                          {receipt.received_at
+                            ? new Date(receipt.received_at).toLocaleDateString('en-GB')
+                            : receipt.uploaded_at
+                              ? new Date(receipt.uploaded_at).toLocaleString('en-IN')
+                              : '-'}
+                        </TableCell>
+                        <TableCell className="text-right">{receipt.purchase_receipt_lines?.length ?? 0}</TableCell>
+                        <TableCell className="text-right">
+                          {receipt.total_amount != null ? `₹${Number(receipt.total_amount).toFixed(2)}` : '-'}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              ) : (
+                <p className="text-sm text-muted-foreground">No purchase receipts created against this purchase order yet.</p>
+              )}
             </CardContent>
           </Card>
 

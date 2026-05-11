@@ -1,0 +1,31 @@
+I want to establish how multiple Purchase receipts can map to a single Purchase Order, how we track the progress of a purchase order
+fulfillment and how to track the last purchased price of a product.
+
+1) A purchase order can be fulfilled in multiple deliveries. However, each delivery is accepted with a purchase receipt
+So every time, we get a delivery against a PO, it might have all the contents of the PO or partial contents.
+
+For eg:
+Purchase Order
+H4-fil 100000
+H4-met 100000
+H4-pack 20000
+
+The supplier gets some of the stuff ready and sends it along with his sales invoice.
+We create a Purchase receipt:
+H4-fil 70000
+H4-met 60000
+We create the Purchase receipt and the quantities of item received are credited into the store.
+
+Now, The edit the purchase Order details page-> Order Items section table to have columns: SKU, Item, Qty ordered, Qty received, Qty Pending, Price and Line Total
+Where we add item qty received in Purchase receipts to Qty received column.
+
+So now after creating the purchase receipt, the PO looks like:
+SKU, Item, Qty ordered, qty received, qty pending, price, line total
+H4-fil, H4 Filament, 100000, 70000, 30000, 0.75, 0.75*100000
+H4-met, H4 Metal Part, 100000, 60000, 40000, 1.25, 1.25*100000
+H4-pack, H4 Packing, 20000, 0, 20000, 0.5, 0.5*20000
+
+Now next time we create a Purchase receipt against this purchase order, we cannot add more qty for an item than the qty pending. 
+
+Also, on the Purchase Order details page, we can see all the purchase receipts that are created against this PO. 
+In this show the basic details of the purchase receipt as well and the PR number can be clickable navigating to PR details page. 

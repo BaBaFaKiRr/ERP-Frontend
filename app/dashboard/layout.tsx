@@ -54,6 +54,7 @@ const ACCOUNTS_CHILDREN = [
 const PURCHASE_CHILDREN = [
   { name: 'Overview', href: '/dashboard/purchase' },
   { name: 'Purchase Orders', href: '/dashboard/purchase/orders' },
+  { name: 'Purchase Receipts', href: '/dashboard/purchase/receipts' },
   { name: 'Suppliers', href: '/dashboard/purchase/suppliers' },
   { name: 'Settings', href: '/dashboard/purchase/settings' },
 ] as const
@@ -320,6 +321,7 @@ function AccountsSidebarSection({ sidebarOpen }: { sidebarOpen: boolean }) {
 function purchaseChildActive(pathname: string, href: (typeof PURCHASE_CHILDREN)[number]['href']) {
   if (href === '/dashboard/purchase') return pathname === '/dashboard/purchase'
   if (href === '/dashboard/purchase/orders') return pathname.startsWith('/dashboard/purchase/orders')
+  if (href === '/dashboard/purchase/receipts') return pathname.startsWith('/dashboard/purchase/receipts')
   if (href === '/dashboard/purchase/suppliers') return pathname.startsWith('/dashboard/purchase/suppliers')
   if (href === '/dashboard/purchase/settings') return pathname.startsWith('/dashboard/purchase/settings')
   return href === '/dashboard/purchase/orders' && pathname.startsWith('/dashboard/purchase/create')

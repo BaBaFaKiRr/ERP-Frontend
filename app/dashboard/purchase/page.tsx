@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import {
   Card,
   CardContent,
@@ -41,6 +42,7 @@ type PurchaseOrderRow = {
 }
 
 export default function PurchaseOverviewPage() {
+  const router = useRouter()
   const [balances, setBalances] = useState<InventoryBalanceRow[]>([])
   const [orders, setOrders] = useState<PurchaseOrderRow[]>([])
   const [loading, setLoading] = useState(true)
@@ -92,21 +94,8 @@ export default function PurchaseOverviewPage() {
       <div className="flex justify-between items-start mb-8">
         <div>
           <h1 className="text-4xl font-bold text-gray-900 dark:text-white">Purchase</h1>
-          <p className="text-gray-600 mt-2">Overview and quick access to purchase operations</p>
         </div>
       </div>
-
-      <Card className="mb-8">
-        <CardHeader>
-          <CardTitle>Purchase Overview</CardTitle>
-          <CardDescription>Monitor stock alerts and latest purchase orders</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <p className="text-sm text-gray-600 dark:text-gray-300">
-            This page now surfaces low-stock alerts and recent purchase order activity.
-          </p>
-        </CardContent>
-      </Card>
 
       {error && <p className="mb-4 text-sm text-red-600">{error}</p>}
 
@@ -114,7 +103,6 @@ export default function PurchaseOverviewPage() {
         <Card>
           <CardHeader>
             <CardTitle>Stock Alerts</CardTitle>
-            <CardDescription>Items below reorder warning</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="overflow-x-auto">
@@ -171,7 +159,6 @@ export default function PurchaseOverviewPage() {
         <Card>
           <CardHeader>
             <CardTitle>Purchase Orders</CardTitle>
-            <CardDescription>Latest purchase order records</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="overflow-x-auto">
@@ -195,7 +182,11 @@ export default function PurchaseOverviewPage() {
                     </TableRow>
                   ) : (
                     recentOrders.map((order) => (
-                      <TableRow key={order.id}>
+                      <TableRow
+                        key={order.id}
+                        className="cursor-pointer hover:bg-gray-50 dark:hover:bg-slate-800/40"
+                        onClick={() => router.push(`/dashboard/purchase/orders/${order.id}`)}
+                      >
                         <TableCell className="font-mono">{order.po_number}</TableCell>
                         <TableCell>{order.suppliers?.name ?? '—'}</TableCell>
                         <TableCell className="capitalize">{order.status.replace(/_/g, ' ')}</TableCell>
@@ -211,28 +202,6 @@ export default function PurchaseOverviewPage() {
           </CardContent>
         </Card>
       </div>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Quick Actions</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="flex gap-3">
-            <Link href="/dashboard/purchase/orders">
-              <Button className="flex items-center gap-2">
-                <span>Open Purchase Orders</span>
-                <ArrowRight size={16} />
-              </Button>
-            </Link>
-            <Button type="button" variant="outline" onClick={() => void load()}>
-              Refresh Widgets
-            </Button>
-          </div>
-          <p className="mt-3 text-xs text-gray-500 dark:text-gray-400">
-            Purchase Orders continues to use the existing PO management screen.
-          </p>
-        </CardContent>
-      </Card>
     </div>
   )
 }

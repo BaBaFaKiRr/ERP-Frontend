@@ -1,0 +1,39 @@
+I want to implement a Purchase Flow
+
+For this, we need a Supplier Object storing the supplier's details. We have a Purchase-> Suppliers page where we can 
+see all the existing suppliers, edit details of a supplier or create new supplier.
+
+When user presses "Add Supplier" button, we take him to "Create Supplier" page. On this page we ask for all the details
+to create the supplier. Details to fetch:
+Basic Details
+1) Name of Entity
+2) Address
+
+Tax Details
+Checkbox: Domestic Supplier, International Supplier
+If chosen Domestic:
+a) GST No. and option to upload GST Certificate (optional)
+a.1) Name on GST                  <Checkbox>Same as Name<autofill from Name of Entity if yes>
+a.2) GST address                  <Checkbox>Same as Address<autofill from Address if yes>
+b) PAN (optional)
+If chosen International:
+i) Supplier Country:
+ii) Supplier TAX Identification Number: (optional)
+
+Bank Details (optional)
+3.1) Name on Account: (autofill from Name on GST immutable)
+3.2) Bank Name and Branch:
+3.3) Account Number:                   IFSC Code:
+
+Person Of Contact (can be multiple) (min one) (give option to add multiple)
+4.1) Name of Person Of Contact
+4.2) Designation
+4.3) Phone Number (opt)
+4.4) Email (opt)
+
+Supplier for : <item> (searchbox to choose from items) (select multiple) (optional)
+<show selection and give option to remove>
+
+                                                                 <button> Create Supplier </button> (ask for confirmation in a nice UI, not default browser alert)
+
+Now Only admin can see the "Add Supplier" button on Suppliers page and only an admin can create a new supplier.

@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { Suspense, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useSearchParams } from 'next/navigation'
@@ -81,6 +81,16 @@ type PurchaseOrder = {
   purchase_order_lines?: PurchaseOrderLine[] | null
 }
 
+type PurchaseReceipt = {
+  status?: string | null
+  uploaded_at?: string | null
+  created_at?: string | null
+  purchase_receipt_lines?: Array<{
+    item_id?: string | null
+    unit_price?: number | null
+  }> | null
+}
+
 type TermsProfile = {
   id: string
   alias: string
@@ -97,6 +107,14 @@ type AddressProfile = {
 }
 
 export default function CreatePurchaseOrderPage() {
+  return (
+    <Suspense fallback={<div className="p-8 text-sm text-muted-foreground">Loading purchase order form...</div>}>
+      <CreatePurchaseOrderContent />
+    </Suspense>
+  )
+}
+
+function CreatePurchaseOrderContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const draftId = searchParams.get('draftId')
@@ -138,12 +156,13 @@ export default function CreatePurchaseOrderPage() {
     setLoading(true)
     setError(null)
     try {
-      const [meRes, suppliersRes, itemsRes, balancesRes, ordersRes, settingsRes, deliveryRes, billingRes] = await Promise.all([
+      const [meRes, suppliersRes, itemsRes, balancesRes, ordersRes, receiptsRes, settingsRes, deliveryRes, billingRes] = await Promise.all([
         erpFetch<{ user: { firstName: string | null; lastName: string | null; email: string } }>('/api/me'),
         erpFetch<{ data: Supplier[] }>('/api/suppliers'),
         erpFetch<{ data: Item[] }>('/api/items?limit=500'),
         erpFetch<{ data: Array<{ item_id: string; qty_on_hand: number | null }> }>('/api/inventory/balances'),
         erpFetch<{ data: PurchaseOrder[] }>('/api/purchase/orders'),
+        erpFetch<{ data: PurchaseReceipt[] }>('/api/purchase/receipts'),
         erpFetch<{ data: TermsProfile[] }>('/api/purchase-settings/terms'),
         erpFetch<{ data: AddressProfile[] }>('/api/purchase-settings/addresses?type=delivery'),
         erpFetch<{ data: AddressProfile[] }>('/api/purchase-settings/addresses?type=billing'),
@@ -159,6 +178,16 @@ export default function CreatePurchaseOrderPage() {
       setStockMap(stocks)
 
       const priceMap: Record<string, number> = {}
+      for (const receipt of receiptsRes.data ?? []) {
+        if (receipt.status === 'cancelled') continue
+        for (const line of receipt.purchase_receipt_lines ?? []) {
+          if (!line.item_id) continue
+          if (priceMap[line.item_id] !== undefined) continue
+          if (line.unit_price != null) {
+            priceMap[line.item_id] = Number(line.unit_price)
+          }
+        }
+      }
       for (const po of ordersRes.data ?? []) {
         for (const line of po.purchase_order_lines ?? []) {
           if (!line.item_id) continue

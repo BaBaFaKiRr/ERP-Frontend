@@ -60,7 +60,7 @@ type StockEntryDetail = {
   work_order_id?: string | null
   material_entry_id?: string | null
   sales_invoice_id?: string | null
-  purchase_invoice_id?: string | null
+  purchase_receipt_id?: string | null
   created_by?: string | null
   deleted_at?: string | null
   stock_entry_lines?: LineRow[] | null
@@ -274,7 +274,7 @@ export default function StockEntryDetailPage() {
             <MetaRow label="Work order ID" value={entry.work_order_id ?? undefined} />
             <MetaRow label="Material entry ID" value={entry.material_entry_id ?? undefined} />
             <MetaRow label="Sales invoice ID" value={entry.sales_invoice_id ?? undefined} />
-            <MetaRow label="Purchase invoice ID" value={entry.purchase_invoice_id ?? undefined} />
+            <MetaRow label="Purchase receipt ID" value={entry.purchase_receipt_id ?? undefined} />
             <MetaRow label="Created by (user ID)" value={entry.created_by ?? undefined} />
           </CardContent>
         </Card>

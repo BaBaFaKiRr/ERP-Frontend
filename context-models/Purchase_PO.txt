@@ -1,0 +1,35 @@
+I want to create a purchase order object.
+Purchase order may be denoted as PO here onward
+
+A PO can be created from the Purchase Orders page or Purchase Overview page -> Stock Alerts widget.
+
+On Create PO page:
+1) Change page heading to Create Purchase Order
+2) On pressing Create Purchase order, got error: JSON.parse: unexpected character at line 1 column 1 of the JSON data
+3) Remove the PO Number text field. We auto assign a PO number to a Purchase order after creation. We keep the nomenclature
+to PO-2026(current year)-00001
+4) Add fields:
+a) Created by: (autofilled by logged in user's name immutable)
+b) Created at: current date and time(immutable)
+c) expected delivery date:
+d) supplier : Search box to search and select a supplier
+e) Choosing a supplier shows the items supplied by the supplier (if any)
+f) Order Items: 
+<Search box to search for an item> <add button>
+(Selecting an item and Pressing add button adds the item to the Order items table)
+The table has fields: SKU, Item Name, Qty in stock(autofill from stock, immutable), Qty to order, Price(autofill from Last ordered price, mutable), Total Price(Qty to order x Price)
+(Show total amount with tax calculation at bottom of table)
+g) Terms and Conditions:
+Choose from the TnC profile (choose default profile)
+
+                                            <Save as Draft> <Generate PO button> (give a nice UI confirmation alert, not browser default alert)
+Save as Draft button saves the PO as a draft and when opened, it opens on the Create Purchase Order Page with details saved as autofilled.
+Generate PO button generates a Purchase Order, stores it, and opens it in a new tab preview window
+This PO appears in Purchase Orders table. I want status associated with a Purchase Order as well. 
+allowed statuses: draft, generated, goods_received, closed.
+So, if the PO is saved as draft, status is draft
+if the PO is generated, the status is generated
+if the goods are received against this PO (we will implement this later), status is goods_received
+if the payment is made (we will implement this later), status is closed 
+
+analyse my sql schemas and give migrations as needed
