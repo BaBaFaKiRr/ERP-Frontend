@@ -48,6 +48,12 @@ const ACCOUNTS_CHILDREN = [
   { name: 'Overview', href: '/dashboard/finance' },
   { name: 'Invoice Requests', href: '/dashboard/finance/invoice-requests' },
   { name: 'Sales Invoices', href: '/dashboard/finance/sales-invoices' },
+  { name: 'Purchase Invoices', href: '/dashboard/finance/purchase-invoices' },
+  { name: 'Debit Notes', href: '/dashboard/finance/debit-notes' },
+  { name: 'Credit Notes', href: '/dashboard/finance/credit-notes' },
+  { name: 'Payment Entries', href: '/dashboard/finance/payment-entries' },
+  { name: 'Journal Entries', href: '/dashboard/finance/journal-entries' },
+  { name: 'Statement of Account', href: '/dashboard/finance/statement-of-account' },
   { name: 'Settings', href: '/dashboard/finance/settings' },
 ] as const
 
@@ -247,6 +253,12 @@ function accountsChildActive(pathname: string, href: (typeof ACCOUNTS_CHILDREN)[
   if (href === '/dashboard/finance') return pathname === '/dashboard/finance'
   if (href === '/dashboard/finance/invoice-requests') return pathname.startsWith('/dashboard/finance/invoice-requests')
   if (href === '/dashboard/finance/sales-invoices') return pathname.startsWith('/dashboard/finance/sales-invoices')
+  if (href === '/dashboard/finance/purchase-invoices') return pathname.startsWith('/dashboard/finance/purchase-invoices')
+  if (href === '/dashboard/finance/debit-notes') return pathname.startsWith('/dashboard/finance/debit-notes')
+  if (href === '/dashboard/finance/credit-notes') return pathname.startsWith('/dashboard/finance/credit-notes')
+  if (href === '/dashboard/finance/payment-entries') return pathname.startsWith('/dashboard/finance/payment-entries')
+  if (href === '/dashboard/finance/journal-entries') return pathname.startsWith('/dashboard/finance/journal-entries')
+  if (href === '/dashboard/finance/statement-of-account') return pathname.startsWith('/dashboard/finance/statement-of-account')
   return pathname.startsWith('/dashboard/finance/settings')
 }
 

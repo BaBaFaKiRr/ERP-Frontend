@@ -3,13 +3,28 @@
 import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { useParams } from 'next/navigation'
-import { ArrowLeft } from 'lucide-react'
+import { ArrowLeft, Pencil } from 'lucide-react'
 import { erpFetch } from '@/lib/erp-api'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+
+type ReceiptDiscrepancy = {
+  id: string
+  issue_type: 'price_mismatch' | 'qty_mismatch' | 'item_mismatch' | 'quality_issue' | 'other'
+  sku?: string | null
+  item_name?: string | null
+  po_unit_price?: number | null
+  seller_invoice_unit_price?: number | null
+  po_quantity?: number | null
+  seller_invoice_quantity?: number | null
+  quantity_received?: number | null
+  rejection_quantity?: number | null
+  notes?: string | null
+  items?: { sku?: string | null; name?: string | null } | null
+}
 
 type ReceiptDetail = {
   id: string
@@ -28,6 +43,15 @@ type ReceiptDetail = {
     quantity?: number | null
     items?: { sku?: string | null; name?: string | null } | null
   }> | null
+  purchase_receipt_discrepancies?: ReceiptDiscrepancy[] | null
+}
+
+const discrepancyLabels: Record<ReceiptDiscrepancy['issue_type'], string> = {
+  price_mismatch: 'Price mismatch',
+  qty_mismatch: 'Qty mismatch',
+  item_mismatch: 'Item mismatch',
+  quality_issue: 'Quality issue',
+  other: 'Other issues',
 }
 
 type PreviewTab = 'receipt' | 'purchase-order'
@@ -42,6 +66,7 @@ export default function PurchaseReceiptDetailPage() {
   const [poPreviewUrl, setPoPreviewUrl] = useState<string | null>(null)
   const [poPreviewError, setPoPreviewError] = useState<string | null>(null)
   const [activePreview, setActivePreview] = useState<PreviewTab>('receipt')
+  const [debitNotes, setDebitNotes] = useState<Array<{ id: string; dn_number: string }>>([])
 
   useEffect(() => {
     void load()
@@ -113,6 +138,10 @@ export default function PurchaseReceiptDetailPage() {
     try {
       const res = await erpFetch<{ data: ReceiptDetail }>(`/api/purchase/receipts/${params.id}`)
       setData(res.data)
+      const debitRes = await erpFetch<{ data: Array<{ id: string; dn_number: string }> }>(
+        `/api/debit-notes?purchase_receipt_id=${params.id}`,
+      )
+      setDebitNotes(debitRes.data ?? [])
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to load purchase receipt details')
     } finally {
@@ -126,20 +155,43 @@ export default function PurchaseReceiptDetailPage() {
     return `${code ? `${code} - ` : ''}${data.suppliers.name ?? ''}`
   }, [data?.suppliers])
 
+  const discrepancies = data?.purchase_receipt_discrepancies ?? []
+  const discrepanciesByType = useMemo(() => {
+    const grouped = new Map<ReceiptDiscrepancy['issue_type'], ReceiptDiscrepancy[]>()
+    for (const row of discrepancies) {
+      const existing = grouped.get(row.issue_type) ?? []
+      existing.push(row)
+      grouped.set(row.issue_type, existing)
+    }
+    return grouped
+  }, [discrepancies])
+
   if (loading) return <div className="p-8 text-sm text-muted-foreground">Loading purchase receipt...</div>
   if (error) return <div className="p-8 text-sm text-red-600">{error}</div>
   if (!data) return <div className="p-8 text-sm text-muted-foreground">Receipt not found.</div>
 
+  const isStatusPaid = (data.status ?? '').trim().toLowerCase() === 'paid'
+
   return (
     <div className="p-8 space-y-6">
-      <div className="flex items-center gap-3">
-        <Link href="/dashboard/purchase/receipts">
-          <Button variant="outline" size="sm" className="gap-2">
-            <ArrowLeft size={16} />
-            Back
-          </Button>
-        </Link>
-        <h1 className="text-3xl font-bold">Purchase Receipt Details</h1>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <Link href="/dashboard/purchase/receipts">
+            <Button variant="outline" size="sm" className="gap-2">
+              <ArrowLeft size={16} />
+              Back
+            </Button>
+          </Link>
+          <h1 className="text-3xl font-bold">Purchase Receipt Details</h1>
+        </div>
+        {!isStatusPaid ? (
+          <Link href={`/dashboard/purchase/receipts/${data.id}/edit`}>
+            <Button variant="outline" size="sm" className="gap-2">
+              <Pencil size={16} />
+              Edit
+            </Button>
+          </Link>
+        ) : null}
       </div>
 
       <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-6">
@@ -233,7 +285,145 @@ export default function PurchaseReceiptDetailPage() {
               )}
             </CardContent>
           </Card>
+
+          {discrepancies.length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Reported Discrepancies</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                {Array.from(discrepanciesByType.entries()).map(([issueType, rows]) => (
+                  <div key={issueType} className="space-y-3">
+                    <p className="text-sm font-medium">{discrepancyLabels[issueType]}</p>
+                    {issueType === 'other' ? (
+                      rows.map((row) => (
+                        <p key={row.id} className="text-sm whitespace-pre-wrap">
+                          {row.notes ?? '—'}
+                        </p>
+                      ))
+                    ) : (
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>SKU</TableHead>
+                            <TableHead>Item</TableHead>
+                            {issueType === 'price_mismatch' && (
+                              <>
+                                <TableHead className="text-right">Price on PO</TableHead>
+                                <TableHead className="text-right">Price on Sales Invoice</TableHead>
+                              </>
+                            )}
+                            {issueType === 'qty_mismatch' && (
+                              <>
+                                <TableHead className="text-right">Qty on PO</TableHead>
+                                <TableHead className="text-right">Qty on Sales Invoice</TableHead>
+                                <TableHead className="text-right">Qty Received</TableHead>
+                              </>
+                            )}
+                            {issueType === 'item_mismatch' && (
+                              <>
+                                <TableHead className="text-right">Qty Received</TableHead>
+                                <TableHead className="text-right">Price on Sales Invoice</TableHead>
+                              </>
+                            )}
+                            {issueType === 'quality_issue' && (
+                              <>
+                                <TableHead className="text-right">Qty Received</TableHead>
+                                <TableHead className="text-right">Rejection Qty</TableHead>
+                              </>
+                            )}
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {rows.map((row) => {
+                            const sku = row.items?.sku ?? row.sku ?? '—'
+                            const itemName = row.items?.name ?? row.item_name ?? '—'
+                            return (
+                              <TableRow key={row.id}>
+                                <TableCell className="font-mono">{sku}</TableCell>
+                                <TableCell>{itemName}</TableCell>
+                                {issueType === 'price_mismatch' && (
+                                  <>
+                                    <TableCell className="text-right">
+                                      {row.po_unit_price != null ? `₹${Number(row.po_unit_price).toFixed(2)}` : '—'}
+                                    </TableCell>
+                                    <TableCell className="text-right">
+                                      {row.seller_invoice_unit_price != null
+                                        ? `₹${Number(row.seller_invoice_unit_price).toFixed(2)}`
+                                        : '—'}
+                                    </TableCell>
+                                  </>
+                                )}
+                                {issueType === 'qty_mismatch' && (
+                                  <>
+                                    <TableCell className="text-right">
+                                      {row.po_quantity != null ? Number(row.po_quantity) : '—'}
+                                    </TableCell>
+                                    <TableCell className="text-right">
+                                      {row.seller_invoice_quantity != null ? Number(row.seller_invoice_quantity) : '—'}
+                                    </TableCell>
+                                    <TableCell className="text-right">
+                                      {row.quantity_received != null ? Number(row.quantity_received) : '—'}
+                                    </TableCell>
+                                  </>
+                                )}
+                                {issueType === 'item_mismatch' && (
+                                  <>
+                                    <TableCell className="text-right">
+                                      {row.quantity_received != null ? Number(row.quantity_received) : '—'}
+                                    </TableCell>
+                                    <TableCell className="text-right">
+                                      {row.seller_invoice_unit_price != null
+                                        ? `₹${Number(row.seller_invoice_unit_price).toFixed(2)}`
+                                        : '—'}
+                                    </TableCell>
+                                  </>
+                                )}
+                                {issueType === 'quality_issue' && (
+                                  <>
+                                    <TableCell className="text-right">
+                                      {row.quantity_received != null ? Number(row.quantity_received) : '—'}
+                                    </TableCell>
+                                    <TableCell className="text-right">
+                                      {row.rejection_quantity != null ? Number(row.rejection_quantity) : '—'}
+                                    </TableCell>
+                                  </>
+                                )}
+                              </TableRow>
+                            )
+                          })}
+                        </TableBody>
+                      </Table>
+                    )}
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+          )}
         </div>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Linked Debit Notes</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {debitNotes.length > 0 ? (
+              <div className="flex flex-wrap gap-3">
+                {debitNotes.map((note) => (
+                  <Link
+                    key={note.id}
+                    href={`/dashboard/finance/debit-notes/${note.id}`}
+                    className="font-mono text-sm font-medium hover:underline"
+                  >
+                    {note.dn_number}
+                  </Link>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground">No linked debit notes.</p>
+            )}
+          </CardContent>
+        </Card>
 
         <Card className="xl:sticky xl:top-6 h-fit">
           <CardHeader>

@@ -51,6 +51,7 @@ export default function PurchaseOrderDetailPage() {
   const [error, setError] = useState<string | null>(null)
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
   const [previewError, setPreviewError] = useState<string | null>(null)
+  const [debitNotes, setDebitNotes] = useState<Array<{ id: string; dn_number: string }>>([])
 
   useEffect(() => {
     if (!params.id) return
@@ -60,6 +61,10 @@ export default function PurchaseOrderDetailPage() {
       try {
         const res = await erpFetch<{ data: PurchaseOrderDetail }>(`/api/purchase/orders/${params.id}`)
         setData(res.data)
+        const debitRes = await erpFetch<{ data: Array<{ id: string; dn_number: string }> }>(
+          `/api/debit-notes?purchase_order_id=${params.id}`,
+        )
+        setDebitNotes(debitRes.data ?? [])
       } catch (e) {
         setError(e instanceof Error ? e.message : 'Failed to load purchase order')
       } finally {
@@ -290,6 +295,29 @@ export default function PurchaseOrderDetailPage() {
                 <p className="text-sm text-muted-foreground mb-1">Notes</p>
                 <div className="text-sm whitespace-pre-wrap rounded-md border p-3">{data.notes?.trim() ? data.notes : '-'}</div>
               </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Linked Debit Notes</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {debitNotes.length > 0 ? (
+                <div className="flex flex-wrap gap-3">
+                  {debitNotes.map((note) => (
+                    <Link
+                      key={note.id}
+                      href={`/dashboard/finance/debit-notes/${note.id}`}
+                      className="font-mono text-sm font-medium hover:underline"
+                    >
+                      {note.dn_number}
+                    </Link>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground">No linked debit notes.</p>
+              )}
             </CardContent>
           </Card>
         </div>

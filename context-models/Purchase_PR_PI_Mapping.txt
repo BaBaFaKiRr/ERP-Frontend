@@ -1,0 +1,13 @@
+Now, the next step in purchase flow is generating a Purchase invoice against one or many purchase receipts
+
+To make a payment for a purchase, we generate a Purchase Invoice where we list all the items received and the PRs received in,
+then we make a payment and close the purchase.
+
+Add a page "Purchase Invoice" under Accounts tab.
+on this page, we show a log of all the PIs. add a "Generate Purchase Invoice" button that takes to create PI page.
+
+On this create PI page, 
+Add a choose Purchase Order section, just like the one on create Purchase receipt page.
+Once we choose this, we get a menu of all the Purchase receipts linked to this PO. We also get a pick option to select multiple PRs
+from these and press add button.
+This shows the PRs with each of their attached Seller's Sales invoices, received items-qty, Reported issues and any partial payments made

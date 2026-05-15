@@ -5,10 +5,27 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuLabel,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 import { Input } from '@/components/ui/input'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { Plus, Search } from 'lucide-react'
+import { Filter, Plus, Search } from 'lucide-react'
 import { erpFetch } from '@/lib/erp-api'
+
+type SupplierTypeFilter = 'all' | 'domestic' | 'international'
+
+const TYPE_FILTER_LABEL: Record<SupplierTypeFilter, string> = {
+  all: 'All types',
+  domestic: 'Domestic',
+  international: 'International',
+}
 
 type SupplierRow = {
   id: string
@@ -34,6 +51,7 @@ export default function SuppliersPage() {
   const [suppliers, setSuppliers] = useState<SupplierRow[]>([])
   const [isAdmin, setIsAdmin] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
+  const [typeFilter, setTypeFilter] = useState<SupplierTypeFilter>('all')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -66,9 +84,12 @@ export default function SuppliersPage() {
 
   const filteredSuppliers = useMemo(() => {
     const term = searchTerm.trim().toLowerCase()
-    if (!term) return suppliers
 
     return suppliers.filter((supplier) => {
+      if (typeFilter !== 'all' && supplier.supplier_type !== typeFilter) return false
+
+      if (!term) return true
+
       const itemSearchHaystack = (supplier.supplier_items ?? [])
         .map((row) => `${row.items?.sku ?? ''} ${row.items?.name ?? ''}`.trim().toLowerCase())
         .join(' ')
@@ -80,7 +101,9 @@ export default function SuppliersPage() {
         itemSearchHaystack.includes(term)
       )
     })
-  }, [searchTerm, suppliers])
+  }, [searchTerm, suppliers, typeFilter])
+
+  const filterActive = typeFilter !== 'all'
 
   return (
     <div className="p-8">
@@ -104,11 +127,20 @@ export default function SuppliersPage() {
       <Card>
         <CardHeader>
           <CardTitle>Supplier Directory</CardTitle>
-          <CardDescription>Search and view all suppliers</CardDescription>
+          <CardDescription>
+            Search and view all suppliers
+            {!loading && (
+              <span className="mt-1 block text-xs text-muted-foreground">
+                Showing {filteredSuppliers.length} of {suppliers.length} suppliers
+                {searchTerm.trim() ? ` · matching “${searchTerm.trim()}”` : ''}
+                {filterActive ? ` · ${TYPE_FILTER_LABEL[typeFilter]}` : ''}
+              </span>
+            )}
+          </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="mb-6 flex gap-4">
-            <div className="relative flex-1">
+          <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center">
+            <div className="relative min-w-0 flex-1">
               <Search className="absolute left-3 top-3 text-gray-400" size={18} />
               <Input
                 placeholder="Search by entity name, GST number, supplier code or item..."
@@ -117,9 +149,38 @@ export default function SuppliersPage() {
                 className="pl-10"
               />
             </div>
-            <Button type="button" variant="outline" onClick={() => void loadSuppliers()}>
-              Refresh
-            </Button>
+            <div className="flex shrink-0 flex-wrap gap-2">
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button type="button" variant="outline" className="gap-2">
+                    <Filter className="size-4" />
+                    Filter
+                    {filterActive ? (
+                      <span className="ml-1 rounded-full bg-primary/15 px-1.5 text-[10px] font-medium text-primary">
+                        on
+                      </span>
+                    ) : null}
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-56">
+                  <DropdownMenuLabel>Filter by type</DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuRadioGroup
+                    value={typeFilter}
+                    onValueChange={(v) => setTypeFilter(v as SupplierTypeFilter)}
+                  >
+                    <DropdownMenuRadioItem value="all">{TYPE_FILTER_LABEL.all}</DropdownMenuRadioItem>
+                    <DropdownMenuRadioItem value="domestic">{TYPE_FILTER_LABEL.domestic}</DropdownMenuRadioItem>
+                    <DropdownMenuRadioItem value="international">
+                      {TYPE_FILTER_LABEL.international}
+                    </DropdownMenuRadioItem>
+                  </DropdownMenuRadioGroup>
+                </DropdownMenuContent>
+              </DropdownMenu>
+              <Button type="button" variant="outline" onClick={() => void loadSuppliers()}>
+                Refresh
+              </Button>
+            </div>
           </div>
 
           <div className="overflow-x-auto">
@@ -133,17 +194,16 @@ export default function SuppliersPage() {
                   <TableHead className="text-gray-700 dark:text-slate-200">GST Number</TableHead>
                   <TableHead className="text-gray-700 dark:text-slate-200">Type</TableHead>
                   <TableHead className="text-gray-700 dark:text-slate-200">Country</TableHead>
-                  {isAdmin && <TableHead className="text-gray-700 dark:text-slate-200">Action</TableHead>}
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {loading ? (
                   <TableRow>
-                    <TableCell colSpan={isAdmin ? 8 : 7}>Loading...</TableCell>
+                    <TableCell colSpan={7}>Loading...</TableCell>
                   </TableRow>
                 ) : filteredSuppliers.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={isAdmin ? 8 : 7}>No suppliers found.</TableCell>
+                    <TableCell colSpan={7}>No suppliers found.</TableCell>
                   </TableRow>
                 ) : (
                   filteredSuppliers.map((supplier) => (
@@ -167,21 +227,6 @@ export default function SuppliersPage() {
                       <TableCell className="text-gray-800 dark:text-slate-200">
                         {supplier.supplier_country ?? '-'}
                       </TableCell>
-                      {isAdmin && (
-                        <TableCell>
-                          <Link href={`/dashboard/purchase/suppliers/${supplier.id}/edit`}>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={(e) => {
-                                e.stopPropagation()
-                              }}
-                            >
-                              Edit
-                            </Button>
-                          </Link>
-                        </TableCell>
-                      )}
                     </TableRow>
                   ))
                 )}

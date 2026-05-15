@@ -1,3 +1,4 @@
+--------------------------------------------------------------------------------------------------------------------------
 I want to establish how multiple Purchase receipts can map to a single Purchase Order, how we track the progress of a purchase order
 fulfillment and how to track the last purchased price of a product.
 
@@ -28,4 +29,54 @@ H4-pack, H4 Packing, 20000, 0, 20000, 0.5, 0.5*20000
 Now next time we create a Purchase receipt against this purchase order, we cannot add more qty for an item than the qty pending. 
 
 Also, on the Purchase Order details page, we can see all the purchase receipts that are created against this PO. 
-In this show the basic details of the purchase receipt as well and the PR number can be clickable navigating to PR details page. 
+In this show the basic details of the purchase receipt as well and the PR number can be clickable navigating to PR details page.
+---------------------------^^^^^^This above part has been implemented^^^--------------------------------------------------
+----------------------------Please implement the below part now-----------------------------------------------------------
+
+Now there may be problems with the purchase content received and the seller's sales invoice. We need to log these at time of 
+creating purchase invoice.
+Possible issues:
+1) The item price on PO and item price on seller's sales invoice do not match
+2) Qty of item received is less than the qty on seller's sales invoice
+3) The item received is different than the one on seller's sales invoice
+4) The item received is same on seller's sales invoice but is not listed on the PO
+5) Item quality is not satisfactory
+
+Now how do we handle this:
+On Add purchase receipt page, add a section "Report Discrepancies" under Documents and payments section.
+In this section, give 5 checkboxes, clicking on each shows new detail fields to fill.
+
+1) The item price on PO and item price on seller's sales invoice do not match
+Checkbox label "Price mismatch"
+Description:
+Search box to search and select an item from the Items in the PO. (search box format like the top Purchase Order section search box)
+This adds the selected item to items table where we have columns: SKU, item , Price on PO, Price on Sales Invoice (to be filled by user)
+add a save button under this.
+
+2) Qty of item received is less than the qty on seller's sales invoice
+Checkbox label "Qty mismatch"
+Description:
+Search box to search and select an item from the Items in the PO. (search box format like the top Purchase Order section search box)
+This adds the selected item to items table where we have columns: SKU, item , Qty on PO, Qty on Sales Invoice (to be filled by user), Qty received(auto fill from top items section but mutable)
+add a save button under this.
+
+3) The item received is different than the one on seller's sales invoice
+Checkbox label "Item mismatch"
+Description:
+items table where we have columns (all columns to be filled by user): SKU(opt), item , Qty received, Price on Sales invoice (opt)
+add a save button under this.
+
+4) Item quality is not satisfactory
+Checkbox label "quality issue"
+Description:
+Search box to search and select an item from the Items in the PO. (search box format like the top Purchase Order section search box)
+This adds the selected item to items table where we have columns: SKU, item , Qty received(auto fill from top items section but mutable), Rejection Qty(to be filled)
+add a save button under this.
+
+5) Report other issues
+Checkbox label "other issues"
+Description of the issue:
+add a save button under this
+
+Now, any reported issues are saved against the purchase receipt and are displayed on Purchase receipt details page.
+Give the needed db migrations to accomodate these additions.

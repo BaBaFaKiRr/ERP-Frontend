@@ -26,6 +26,13 @@ type SalesInvoiceDetail = {
   cancelled_by_name?: string | null
 }
 
+type LinkedCreditNote = {
+  id: string
+  cn_number: string
+  credit_note_date?: string | null
+  rounded_total?: number | null
+}
+
 export default function SalesInvoiceDetailPage() {
   const params = useParams<{ id: string }>()
   const [row, setRow] = useState<SalesInvoiceDetail | null>(null)
@@ -38,6 +45,7 @@ export default function SalesInvoiceDetailPage() {
   const [cancelDialogOpen, setCancelDialogOpen] = useState(false)
   const [cancelReason, setCancelReason] = useState('')
   const [cancelAt, setCancelAt] = useState<string>('')
+  const [creditNotes, setCreditNotes] = useState<LinkedCreditNote[]>([])
 
   const actorName = `${me?.firstName ?? ''} ${me?.lastName ?? ''}`.trim() || me?.email || 'Unknown User'
 
@@ -59,6 +67,11 @@ export default function SalesInvoiceDetailPage() {
     try {
       const res = await erpFetch<{ data: SalesInvoiceDetail }>(`/api/dispatch-sales-invoices/${params.id}`)
       setRow(res.data ?? null)
+
+      const creditNotesRes = await erpFetch<{ data: LinkedCreditNote[] }>(
+        `/api/credit-notes?dispatch_sales_invoice_id=${encodeURIComponent(params.id)}`,
+      )
+      setCreditNotes(creditNotesRes.data ?? [])
 
       const supabase = createClient()
       const { data: sessionData } = await supabase.auth.getSession()
@@ -195,6 +208,33 @@ export default function SalesInvoiceDetailPage() {
                   {row.status === 'active' ? 'Active' : 'Cancelled'}
                 </span>
               </p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Credit Notes</CardTitle>
+              <CardDescription>Credit notes issued against this sales invoice.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3 text-sm">
+              {creditNotes.length === 0 ? (
+                <p className="text-muted-foreground">No credit notes linked to this invoice.</p>
+              ) : (
+                creditNotes.map((note) => (
+                  <div key={note.id} className="flex flex-wrap items-center justify-between gap-3 rounded-md border p-3">
+                    <Link href={`/dashboard/finance/credit-notes/${note.id}`} className="font-mono font-medium hover:underline">
+                      {note.cn_number}
+                    </Link>
+                    <span>{note.credit_note_date ? new Date(note.credit_note_date).toLocaleDateString('en-IN') : '—'}</span>
+                    <span>₹{Number(note.rounded_total ?? 0).toFixed(2)}</span>
+                  </div>
+                ))
+              )}
+              <div>
+                <Button asChild variant="outline" size="sm">
+                  <Link href={`/dashboard/finance/credit-notes/new?dispatch_sales_invoice_id=${row.id}`}>Create Credit Note</Link>
+                </Button>
+              </div>
             </CardContent>
           </Card>
 

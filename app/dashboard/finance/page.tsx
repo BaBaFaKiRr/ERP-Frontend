@@ -39,6 +39,30 @@ type InvoiceFamilyGroup = {
   latestCreatedAt: string
 }
 
+type PaymentDueRow = {
+  id: string
+  pi_number: string
+  supplier_name: string
+  supplier_code?: string | null
+  due_date: string
+  days_overdue: number
+  total_amount: number
+  status: string
+}
+
+type ReceivableDueRow = {
+  id: string
+  invoice_number: string
+  customer_name: string
+  due_date: string
+  days_overdue: number
+  total_amount: number
+}
+
+function formatCurrency(value: number): string {
+  return `₹${value.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+}
+
 function familyKey(invoiceNumber: string): string {
   const m = invoiceNumber.match(/^(.*)-\d{3}$/)
   return m?.[1] ?? invoiceNumber
@@ -54,14 +78,19 @@ export default function FinancePage() {
   const [salesInvoiceToDate, setSalesInvoiceToDate] = useState('')
   const [expandedWidgetFamilies, setExpandedWidgetFamilies] = useState<Record<string, boolean>>({})
   const [loadingMetrics, setLoadingMetrics] = useState(true)
+  const [paymentsDue, setPaymentsDue] = useState<PaymentDueRow[]>([])
+  const [receivablesDue, setReceivablesDue] = useState<ReceivableDueRow[]>([])
 
   useEffect(() => {
     void (async () => {
       setLoadingMetrics(true)
       try {
-        const [invoiceRequestsRes, salesInvoicesRes] = await Promise.all([
+        const [invoiceRequestsRes, salesInvoicesRes, remindersRes] = await Promise.all([
           erpFetch<{ data: InvoiceRequest[] }>('/api/dispatch/orders?status=awaiting_invoice'),
           erpFetch<{ data: SalesInvoice[] }>('/api/dispatch-sales-invoices'),
+          erpFetch<{ data: { payments_due: PaymentDueRow[]; receivables_due: ReceivableDueRow[] } }>(
+            '/api/accounts/payment-reminders',
+          ),
         ])
 
         const invoiceRequests = (invoiceRequestsRes.data ?? [])
@@ -74,10 +103,14 @@ export default function FinancePage() {
         setInvoiceRequestCount(invoiceRequests.length)
         setInvoiceRequestsPreview(invoiceRequests.slice(0, 5))
         setSalesInvoices(salesInvoices)
+        setPaymentsDue(remindersRes.data?.payments_due ?? [])
+        setReceivablesDue(remindersRes.data?.receivables_due ?? [])
       } catch {
         setInvoiceRequestCount(0)
         setInvoiceRequestsPreview([])
         setSalesInvoices([])
+        setPaymentsDue([])
+        setReceivablesDue([])
       } finally {
         setLoadingMetrics(false)
       }
@@ -165,6 +198,101 @@ export default function FinancePage() {
             </Link>
           </Button>
         </div>
+      </div>
+
+      <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-2">
+        <Card className="border-border/70 bg-card/70 backdrop-blur-sm border-amber-500/30">
+          <CardHeader className="pb-2">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <CardTitle className="text-xl font-bold">
+                  <Link href="/dashboard/finance/purchase-invoices" className="hover:underline">
+                    Payments Due
+                  </Link>
+                </CardTitle>
+                <CardDescription>Purchase invoices past their due date</CardDescription>
+              </div>
+              <span className="rounded-full bg-amber-500/15 px-2.5 py-1 text-sm font-semibold text-amber-700 dark:text-amber-300">
+                {loadingMetrics ? '—' : paymentsDue.length}
+              </span>
+            </div>
+          </CardHeader>
+          <CardContent>
+            {!loadingMetrics && paymentsDue.length > 0 ? (
+              <div className="space-y-2">
+                {paymentsDue.slice(0, 5).map((row) => (
+                  <Link
+                    key={row.id}
+                    href={`/dashboard/finance/purchase-invoices/${row.id}`}
+                    className="block rounded-md border border-border/60 p-2 text-sm hover:bg-muted/40"
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <p className="font-mono font-medium">{row.pi_number}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {row.supplier_code ? `${row.supplier_code} · ` : ''}
+                          {row.supplier_name}
+                        </p>
+                      </div>
+                      <div className="text-right text-xs">
+                        <p className="font-medium text-amber-700 dark:text-amber-300">{row.days_overdue}d overdue</p>
+                        <p className="text-muted-foreground">{formatCurrency(row.total_amount)}</p>
+                      </div>
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            ) : null}
+            {!loadingMetrics && paymentsDue.length === 0 ? (
+              <p className="text-sm text-muted-foreground">No purchase invoices are past due.</p>
+            ) : null}
+          </CardContent>
+        </Card>
+
+        <Card className="border-border/70 bg-card/70 backdrop-blur-sm border-amber-500/30">
+          <CardHeader className="pb-2">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <CardTitle className="text-xl font-bold">
+                  <Link href="/dashboard/finance/sales-invoices" className="hover:underline">
+                    Receivables Due
+                  </Link>
+                </CardTitle>
+                <CardDescription>Sales invoices past their due date</CardDescription>
+              </div>
+              <span className="rounded-full bg-amber-500/15 px-2.5 py-1 text-sm font-semibold text-amber-700 dark:text-amber-300">
+                {loadingMetrics ? '—' : receivablesDue.length}
+              </span>
+            </div>
+          </CardHeader>
+          <CardContent>
+            {!loadingMetrics && receivablesDue.length > 0 ? (
+              <div className="space-y-2">
+                {receivablesDue.slice(0, 5).map((row) => (
+                  <Link
+                    key={row.id}
+                    href={`/dashboard/finance/sales-invoices/${row.id}`}
+                    className="block rounded-md border border-border/60 p-2 text-sm hover:bg-muted/40"
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <p className="font-mono font-medium">{row.invoice_number}</p>
+                        <p className="text-xs text-muted-foreground">{row.customer_name}</p>
+                      </div>
+                      <div className="text-right text-xs">
+                        <p className="font-medium text-amber-700 dark:text-amber-300">{row.days_overdue}d overdue</p>
+                        <p className="text-muted-foreground">{formatCurrency(row.total_amount)}</p>
+                      </div>
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            ) : null}
+            {!loadingMetrics && receivablesDue.length === 0 ? (
+              <p className="text-sm text-muted-foreground">No sales invoices are past due.</p>
+            ) : null}
+          </CardContent>
+        </Card>
       </div>
 
       <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-2">
