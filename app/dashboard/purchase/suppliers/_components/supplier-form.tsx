@@ -411,25 +411,28 @@ export function SupplierForm({
           <CardDescription>Choose domestic or international supplier details</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="flex gap-6">
-            <label className="flex items-center gap-2 text-sm">
-              <Checkbox
-                checked={supplierType === 'domestic'}
-                onCheckedChange={(checked) => {
-                  if (checked) setSupplierType('domestic')
-                }}
-              />
-              Domestic Supplier
-            </label>
-            <label className="flex items-center gap-2 text-sm">
-              <Checkbox
-                checked={supplierType === 'international'}
-                onCheckedChange={(checked) => {
-                  if (checked) setSupplierType('international')
-                }}
-              />
-              International Supplier
-            </label>
+          <div>
+            <p className="mb-2 text-sm font-medium">Supplier Type *</p>
+            <div className="flex gap-6">
+              <label className="flex items-center gap-2 text-sm">
+                <Checkbox
+                  checked={supplierType === 'domestic'}
+                  onCheckedChange={(checked) => {
+                    if (checked) setSupplierType('domestic')
+                  }}
+                />
+                Domestic Supplier
+              </label>
+              <label className="flex items-center gap-2 text-sm">
+                <Checkbox
+                  checked={supplierType === 'international'}
+                  onCheckedChange={(checked) => {
+                    if (checked) setSupplierType('international')
+                  }}
+                />
+                International Supplier
+              </label>
+            </div>
           </div>
 
           {supplierType === 'domestic' ? (
@@ -439,7 +442,7 @@ export function SupplierForm({
                 <Input value={gstNumber} onChange={(e) => setGstNumber(e.target.value)} />
               </div>
               <div>
-                <p className="mb-1 text-sm font-medium">GST Certificate Upload (optional)</p>
+                <p className="mb-1 text-sm font-medium">GST Certificate Upload</p>
                 <Input
                   type="file"
                   accept=".pdf,.png,.jpg,.jpeg,.webp"
@@ -483,7 +486,7 @@ export function SupplierForm({
                 />
               </div>
               <div>
-                <p className="mb-1 text-sm font-medium">PAN (optional)</p>
+                <p className="mb-1 text-sm font-medium">PAN</p>
                 <Input value={pan} onChange={(e) => setPan(e.target.value)} />
               </div>
             </div>
@@ -494,7 +497,7 @@ export function SupplierForm({
                 <Input value={supplierCountry} onChange={(e) => setSupplierCountry(e.target.value)} />
               </div>
               <div>
-                <p className="mb-1 text-sm font-medium">Tax Identification Number (optional)</p>
+                <p className="mb-1 text-sm font-medium">Tax Identification Number</p>
                 <Input value={taxIdNumber} onChange={(e) => setTaxIdNumber(e.target.value)} />
               </div>
             </div>
@@ -504,7 +507,7 @@ export function SupplierForm({
 
       <Card>
         <CardHeader>
-          <CardTitle>Bank Details (optional)</CardTitle>
+          <CardTitle>Bank Details</CardTitle>
         </CardHeader>
         <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
@@ -538,7 +541,7 @@ export function SupplierForm({
 
       <Card>
         <CardHeader>
-          <CardTitle>Person Of Contact</CardTitle>
+          <CardTitle>Person Of Contact *</CardTitle>
           <CardDescription>At least one contact is required</CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
@@ -560,14 +563,14 @@ export function SupplierForm({
                   />
                 </div>
                 <div>
-                  <p className="mb-1 text-sm font-medium">Phone (optional)</p>
+                  <p className="mb-1 text-sm font-medium">Phone</p>
                   <Input
                     value={contact.phone}
                     onChange={(e) => upsertContact(index, 'phone', e.target.value)}
                   />
                 </div>
                 <div>
-                  <p className="mb-1 text-sm font-medium">Email (optional)</p>
+                  <p className="mb-1 text-sm font-medium">Email</p>
                   <Input
                     value={contact.email}
                     onChange={(e) => upsertContact(index, 'email', e.target.value)}
@@ -591,7 +594,7 @@ export function SupplierForm({
 
       <Card>
         <CardHeader>
-          <CardTitle>Supplier for Items (optional)</CardTitle>
+          <CardTitle>Supplier for Items</CardTitle>
           <CardDescription>Select multiple items</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">

@@ -11,9 +11,11 @@ import {
 } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import Image from 'next/image'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
+import { LEJER_LOGO_MARK_SRC } from '@/lib/branding'
 
 export default function Page() {
   const [email, setEmail] = useState('')
@@ -51,11 +53,25 @@ export default function Page() {
     <div className="flex min-h-svh w-full items-center justify-center p-6 md:p-10">
       <div className="w-full max-w-sm">
         <div className="flex flex-col gap-6">
+          <div className="flex flex-col items-center gap-3 text-center">
+            <Image
+              src={LEJER_LOGO_MARK_SRC}
+              alt=""
+              width={72}
+              height={72}
+              className="object-contain"
+              priority
+            />
+            <div>
+              <p className="text-2xl font-semibold tracking-tight">LEJER</p>
+              <p className="text-muted-foreground text-sm">Manufacturing ERP</p>
+            </div>
+          </div>
           <Card>
             <CardHeader>
               <CardTitle className="text-2xl">Login</CardTitle>
               <CardDescription>
-                Enter your email below to login to your account
+                Enter your email below to sign in to LEJER
               </CardDescription>
             </CardHeader>
             <CardContent>

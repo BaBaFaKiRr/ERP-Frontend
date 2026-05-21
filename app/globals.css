@@ -48,7 +48,7 @@
 .dark {
   --background: oklch(0.145 0 0);
   --foreground: oklch(0.985 0 0);
-  --card: oklch(0.145 0 0);
+  --card: oklch(0.16 0.02 250 / 0.55);
   --card-foreground: oklch(0.985 0 0);
   --popover: oklch(0.145 0 0);
   --popover-foreground: oklch(0.985 0 0);
@@ -139,5 +139,45 @@
   }
   body {
     @apply bg-background text-app-text-primary;
+  }
+  html.dark {
+    background-color: #000000;
+    background-image:
+      radial-gradient(ellipse 90% 70% at 0% 50%, rgba(59, 130, 246, 0.35) 0%, transparent 55%),
+      linear-gradient(180deg, #000000 0%, #050505 28%, #0d1b2a 50%, #0a1525 72%, #000000 100%);
+    background-attachment: fixed;
+    min-height: 100%;
+  }
+  html.dark body {
+    background: transparent;
+    min-height: 100vh;
+  }
+}
+
+@layer utilities {
+  /* Light: full ambient stack (violet, cyan, fuchsia, green) — not toggled by Colorful */
+  html.light .dashboard-dark-bg {
+    background-image:
+      radial-gradient(circle at top left, rgba(124, 58, 237, 0.2), transparent 40%),
+      radial-gradient(circle at top right, rgba(14, 165, 233, 0.12), transparent 35%),
+      radial-gradient(circle at 92% 6%, rgba(192, 38, 211, 0.12), transparent 35%),
+      radial-gradient(circle at bottom right, rgba(34, 197, 94, 0.12), transparent 35%);
+  }
+
+  html.dark .dashboard-dark-bg {
+    background-color: #000000 !important;
+    background-image:
+      radial-gradient(ellipse 90% 70% at 0% 50%, rgba(59, 130, 246, 0.35) 0%, transparent 55%),
+      linear-gradient(180deg, #000000 0%, #050505 28%, #0d1b2a 50%, #0a1525 72%, #000000 100%) !important;
+    background-attachment: fixed;
+  }
+
+  html.dark .dashboard-dark-bg.dashboard-colorful-accents {
+    background-image:
+      radial-gradient(ellipse 90% 70% at 0% 50%, rgba(59, 130, 246, 0.35) 0%, transparent 55%),
+      radial-gradient(ellipse 75% 60% at 100% 10%, rgba(192, 38, 211, 0.35) 0%, transparent 55%),
+      radial-gradient(ellipse 75% 60% at 100% 90%, rgba(34, 197, 94, 0.35) 0%, transparent 55%),
+      linear-gradient(180deg, #000000 0%, #050505 28%, #0d1b2a 50%, #0a1525 72%, #000000 100%) !important;
+    background-attachment: fixed;
   }
 }

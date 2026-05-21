@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import Image from 'next/image'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useRouter } from 'next/navigation'
@@ -26,6 +27,7 @@ import {
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { useTheme } from 'next-themes'
+import { LEJER_LOGO_MARK_SRC } from '@/lib/branding'
 
 const INVENTORY_CHILDREN = [
   { name: 'Items', href: '/dashboard/inventory/items' },
@@ -65,6 +67,17 @@ const PURCHASE_CHILDREN = [
   { name: 'Settings', href: '/dashboard/purchase/settings' },
 ] as const
 
+const SALES_CHILDREN = [
+  { name: 'Overview', href: '/dashboard/sales' },
+  { name: 'Sales Orders', href: '/dashboard/sales/orders' },
+  { name: 'Customers', href: '/dashboard/sales/customers' },
+] as const
+
+const HR_CHILDREN = [
+  { name: 'Overview', href: '/dashboard/hr' },
+  { name: 'Employees', href: '/dashboard/hr/employees' },
+] as const
+
 function inventoryChildActive(pathname: string, href: (typeof INVENTORY_CHILDREN)[number]['href']) {
   if (href === '/dashboard/inventory') {
     return pathname === '/dashboard/inventory'
@@ -91,9 +104,7 @@ function inventoryChildActive(pathname: string, href: (typeof INVENTORY_CHILDREN
 }
 
 const navigationAfterInventory = [
-  { name: 'Sales Orders', href: '/dashboard/sales', icon: ShoppingCart },
   { name: 'Dispatch', href: '/dashboard/dispatch', icon: Truck },
-  { name: 'HR & Employees', href: '/dashboard/hr', icon: Users },
   { name: 'Admin', href: '/dashboard/admin', icon: Settings },
 ]
 
@@ -407,6 +418,172 @@ function PurchaseSidebarSection({ sidebarOpen }: { sidebarOpen: boolean }) {
   )
 }
 
+function salesChildActive(pathname: string, href: (typeof SALES_CHILDREN)[number]['href']) {
+  if (href === '/dashboard/sales') return pathname === '/dashboard/sales'
+  if (href === '/dashboard/sales/customers') return pathname.startsWith('/dashboard/sales/customers')
+  if (href === '/dashboard/sales/orders') {
+    if (pathname.startsWith('/dashboard/sales/orders')) return true
+    if (pathname === '/dashboard/sales/create') return true
+    if (!pathname.startsWith('/dashboard/sales/')) return false
+    if (pathname.startsWith('/dashboard/sales/customers')) return false
+    if (pathname === '/dashboard/sales') return false
+    return true
+  }
+  return false
+}
+
+function SalesSidebarSection({ sidebarOpen }: { sidebarOpen: boolean }) {
+  const pathname = usePathname()
+  const underSales = pathname.startsWith('/dashboard/sales')
+  const [expanded, setExpanded] = useState(underSales)
+
+  useEffect(() => {
+    if (underSales) setExpanded(true)
+  }, [underSales])
+
+  if (!sidebarOpen) {
+    return (
+      <Link
+        href="/dashboard/sales"
+        className={cn(
+          'text-app-nav-text-muted hover:text-app-nav-text flex items-center justify-center rounded-xl p-3 transition-colors hover:bg-slate-100 dark:hover:bg-white/10',
+          underSales && 'bg-slate-100 text-app-nav-text dark:bg-white/10',
+        )}
+        title="Sales"
+      >
+        <ShoppingCart size={20} />
+      </Link>
+    )
+  }
+
+  return (
+    <div className="mb-1">
+      <button
+        type="button"
+        onClick={() => setExpanded((e) => !e)}
+        className={cn(
+          'text-app-nav-text-muted hover:text-app-nav-text flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition-colors hover:bg-slate-100 dark:hover:bg-white/10',
+          underSales && 'bg-slate-100 text-app-nav-text dark:bg-white/10',
+        )}
+        aria-expanded={expanded}
+      >
+        <ShoppingCart size={20} className="shrink-0" />
+        <span className="flex-1 font-medium">Sales</span>
+        {expanded ? (
+          <ChevronDown size={18} className="shrink-0 opacity-80" />
+        ) : (
+          <ChevronRight size={18} className="shrink-0 opacity-80" />
+        )}
+      </button>
+      {expanded && (
+        <div className="mt-1 space-y-1 border-l border-slate-200 ml-6 pl-2 mr-2 py-1 dark:border-white/15">
+          {SALES_CHILDREN.map((child) => {
+            const active = salesChildActive(pathname, child.href)
+            return (
+              <Link
+                key={child.href}
+                href={child.href}
+                className={cn(
+                  'block rounded-lg px-3 py-2 text-sm transition-colors',
+                  active
+                    ? 'bg-slate-100 text-app-nav-text font-medium dark:bg-white/10'
+                    : 'text-app-nav-text-muted hover:text-app-nav-text hover:bg-slate-100 dark:hover:bg-white/10',
+                )}
+              >
+                {child.name}
+              </Link>
+            )
+          })}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function hrChildActive(pathname: string, href: (typeof HR_CHILDREN)[number]['href']) {
+  if (href === '/dashboard/hr') return pathname === '/dashboard/hr'
+  if (href === '/dashboard/hr/employees') {
+    if (pathname.startsWith('/dashboard/hr/employees')) return true
+    if (pathname === '/dashboard/hr/new') return true
+    if (pathname.startsWith('/dashboard/hr/edit-logs')) return true
+    if (pathname.startsWith('/dashboard/hr/import-export')) return true
+    const rest = pathname.slice('/dashboard/hr/'.length)
+    if (rest && !rest.includes('/') && rest !== 'employees') return true
+    return false
+  }
+  return false
+}
+
+function HRSidebarSection({ sidebarOpen }: { sidebarOpen: boolean }) {
+  const pathname = usePathname()
+  const underHr = pathname.startsWith('/dashboard/hr')
+  const [expanded, setExpanded] = useState(underHr)
+
+  useEffect(() => {
+    if (underHr) setExpanded(true)
+  }, [underHr])
+
+  if (!sidebarOpen) {
+    return (
+      <Link
+        href="/dashboard/hr"
+        className={cn(
+          'text-app-nav-text-muted hover:text-app-nav-text flex items-center justify-center rounded-xl p-3 transition-colors hover:bg-slate-100 dark:hover:bg-white/10',
+          underHr && 'bg-slate-100 text-app-nav-text dark:bg-white/10',
+        )}
+        title="HR"
+      >
+        <Users size={20} />
+      </Link>
+    )
+  }
+
+  return (
+    <div className="mb-1">
+      <button
+        type="button"
+        onClick={() => setExpanded((e) => !e)}
+        className={cn(
+          'text-app-nav-text-muted hover:text-app-nav-text flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition-colors hover:bg-slate-100 dark:hover:bg-white/10',
+          underHr && 'bg-slate-100 text-app-nav-text dark:bg-white/10',
+        )}
+        aria-expanded={expanded}
+      >
+        <Users size={20} className="shrink-0" />
+        <span className="flex-1 font-medium">HR</span>
+        {expanded ? (
+          <ChevronDown size={18} className="shrink-0 opacity-80" />
+        ) : (
+          <ChevronRight size={18} className="shrink-0 opacity-80" />
+        )}
+      </button>
+      {expanded && (
+        <div className="mt-1 space-y-1 border-l border-slate-200 ml-6 pl-2 mr-2 py-1 dark:border-white/15">
+          {HR_CHILDREN.map((child) => {
+            const active = hrChildActive(pathname, child.href)
+            return (
+              <Link
+                key={child.href}
+                href={child.href}
+                className={cn(
+                  'block rounded-lg px-3 py-2 text-sm transition-colors',
+                  active
+                    ? 'bg-slate-100 text-app-nav-text font-medium dark:bg-white/10'
+                    : 'text-app-nav-text-muted hover:text-app-nav-text hover:bg-slate-100 dark:hover:bg-white/10',
+                )}
+              >
+                {child.name}
+              </Link>
+            )
+          })}
+        </div>
+      )}
+    </div>
+  )
+}
+
+const COLORFUL_ACCENTS_LS_KEY = 'erp-dashboard-colorful-accents'
+
 export default function DashboardLayout({
   children,
 }: {
@@ -414,6 +591,7 @@ export default function DashboardLayout({
 }) {
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const [mounted, setMounted] = useState(false)
+  const [colorfulAccents, setColorfulAccents] = useState(true)
   const router = useRouter()
   const pathname = usePathname()
   const supabase = createClient()
@@ -423,29 +601,64 @@ export default function DashboardLayout({
     setMounted(true)
   }, [])
 
+  useEffect(() => {
+    if (!mounted) return
+    const stored = localStorage.getItem(COLORFUL_ACCENTS_LS_KEY)
+    if (stored !== null) {
+      setColorfulAccents(stored === 'true')
+    }
+  }, [mounted])
+
   const handleLogout = async () => {
     await supabase.auth.signOut()
     router.push('/auth/login')
   }
 
+  const toggleColorfulAccents = () => {
+    setColorfulAccents((prev) => {
+      const next = !prev
+      localStorage.setItem(COLORFUL_ACCENTS_LS_KEY, String(next))
+      return next
+    })
+  }
+
   return (
-    <div className="h-screen overflow-hidden bg-[radial-gradient(circle_at_top_left,_rgba(124,58,237,0.2),_transparent_40%),radial-gradient(circle_at_top_right,_rgba(14,165,233,0.12),_transparent_35%)] bg-background p-3">
+    <div
+      className={cn(
+        'dashboard-dark-bg h-screen overflow-hidden bg-background p-3',
+        mounted && resolvedTheme === 'dark' && colorfulAccents && 'dashboard-colorful-accents',
+      )}
+    >
       <div className="flex h-full gap-3">
       <aside
         className={cn(
-          sidebarOpen ? 'w-72' : 'w-20',
-          'flex h-full shrink-0 flex-col rounded-2xl border border-slate-200 bg-white text-slate-900 shadow-[0_24px_80px_-32px_rgba(15,23,42,0.35)] backdrop-blur-xl transition-all duration-300 dark:border-white/10 dark:bg-[#0b1020]/85 dark:text-white dark:shadow-[0_24px_80px_-32px_rgba(15,23,42,0.9)]',
+          sidebarOpen ? 'w-64' : 'w-20',
+          'flex h-full shrink-0 flex-col rounded-2xl border border-slate-200 bg-white text-slate-900 shadow-[0_24px_80px_-32px_rgba(15,23,42,0.35)] backdrop-blur-xl transition-all duration-300 dark:border-white/10 dark:bg-[#0a0e16]/75 dark:text-white dark:shadow-[0_24px_80px_-32px_rgba(0,0,0,0.65)] dark:backdrop-blur-md',
         )}
       >
-        <div className="flex items-center justify-between border-b border-slate-200 p-4 dark:border-white/10">
-          {sidebarOpen && (
-            <div>
-              <p className="text-app-nav-text-soft text-xs uppercase tracking-[0.22em]">
-                ERP Workspace
-              </p>
-              <h1 className="text-lg font-semibold">Core Operations</h1>
-            </div>
-          )}
+        <div className="flex items-center justify-between gap-2 border-b border-slate-200 p-4 dark:border-white/10">
+          <div className="flex min-w-0 flex-1 items-center gap-3">
+            <Link
+              href="/dashboard"
+              className="relative shrink-0 rounded-lg outline-offset-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring"
+              aria-label="LEJER home"
+            >
+              <Image
+                src={LEJER_LOGO_MARK_SRC}
+                alt=""
+                width={sidebarOpen ? 44 : 36}
+                height={sidebarOpen ? 44 : 36}
+                className="object-contain"
+                priority
+              />
+            </Link>
+            {sidebarOpen && (
+              <div className="min-w-0">
+                <h1 className="truncate text-lg font-semibold tracking-tight">LEJER</h1>
+                <p className="text-app-nav-text-soft text-xs">Manufacturing ERP</p>
+              </div>
+            )}
+          </div>
           <button
             onClick={() => setSidebarOpen(!sidebarOpen)}
             className="text-app-nav-text-soft hover:text-app-nav-text rounded-lg p-2 hover:bg-slate-100 dark:hover:bg-white/10"
@@ -470,6 +683,8 @@ export default function DashboardLayout({
           <ManufacturingSidebarSection sidebarOpen={sidebarOpen} />
           <AccountsSidebarSection sidebarOpen={sidebarOpen} />
           <PurchaseSidebarSection sidebarOpen={sidebarOpen} />
+          <SalesSidebarSection sidebarOpen={sidebarOpen} />
+          <HRSidebarSection sidebarOpen={sidebarOpen} />
 
           {navigationAfterInventory.map((item) => (
             <Link
@@ -501,21 +716,35 @@ export default function DashboardLayout({
         </div>
       </aside>
 
-      <main className="flex-1 overflow-hidden rounded-2xl border border-border/50 bg-background/75 backdrop-blur-xl">
+      <main className="flex-1 overflow-hidden rounded-2xl border border-border/50 bg-background/75 backdrop-blur-xl dark:border-white/10 dark:bg-transparent dark:shadow-none dark:backdrop-blur-none">
         <header className="flex h-16 items-center justify-between border-b border-border/60 px-6">
-          <div>
-            <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Workspace</p>
+          <div className="flex items-center gap-2">
+            <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">LEJER</p>
           </div>
-          <Button
-            type="button"
-            variant="outline"
-            className="rounded-xl border-border/70 bg-background/60"
-            onClick={() => setTheme(resolvedTheme === 'dark' ? 'light' : 'dark')}
-            aria-label="Toggle theme"
-          >
-            {mounted && resolvedTheme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
-            <span>{mounted && resolvedTheme === 'dark' ? 'Light mode' : 'Dark mode'}</span>
-          </Button>
+          <div className="flex items-center gap-2">
+            {mounted && resolvedTheme === 'dark' ? (
+              <Button
+                type="button"
+                variant={colorfulAccents ? 'secondary' : 'outline'}
+                className="rounded-xl border-border/70 bg-background/60"
+                onClick={toggleColorfulAccents}
+                aria-pressed={colorfulAccents}
+                aria-label={colorfulAccents ? 'Turn off purple and green background accents' : 'Turn on purple and green background accents'}
+              >
+                Colorful
+              </Button>
+            ) : null}
+            <Button
+              type="button"
+              variant="outline"
+              className="rounded-xl border-border/70 bg-background/60"
+              onClick={() => setTheme(resolvedTheme === 'dark' ? 'light' : 'dark')}
+              aria-label="Toggle theme"
+            >
+              {mounted && resolvedTheme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
+              <span>{mounted && resolvedTheme === 'dark' ? 'Light mode' : 'Dark mode'}</span>
+            </Button>
+          </div>
         </header>
         <div className="h-[calc(100%-4rem)] overflow-auto">{children}</div>
       </main>

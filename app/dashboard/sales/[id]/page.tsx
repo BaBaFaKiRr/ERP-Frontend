@@ -281,7 +281,7 @@ export default function SalesOrderDetailPage() {
     return (
       <div className="p-8">
         <Button variant="ghost" asChild className="mb-4">
-          <Link href="/dashboard/sales">
+          <Link href="/dashboard/sales/orders">
             <ArrowLeft className="mr-2 size-4" />
             Back to sales orders
           </Link>
@@ -339,7 +339,7 @@ export default function SalesOrderDetailPage() {
       <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mb-8">
         <div className="flex items-start gap-4">
           <Button variant="ghost" size="icon" asChild>
-            <Link href="/dashboard/sales" aria-label="Back">
+            <Link href="/dashboard/sales/orders" aria-label="Back">
               <ArrowLeft size={20} />
             </Link>
           </Button>

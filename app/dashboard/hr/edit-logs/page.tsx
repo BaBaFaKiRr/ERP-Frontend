@@ -44,7 +44,7 @@ export default function HREditLogsPage() {
           <p className="text-gray-600 mt-1">Audit trail for changes made to employee records</p>
         </div>
         <Button asChild variant="outline">
-          <Link href="/dashboard/hr">Back to HR</Link>
+          <Link href="/dashboard/hr/employees">Back to Employees</Link>
         </Button>
       </div>
 

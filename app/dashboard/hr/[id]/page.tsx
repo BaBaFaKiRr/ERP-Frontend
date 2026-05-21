@@ -3,6 +3,7 @@
 import { type FormEvent, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { useParams } from 'next/navigation'
+import { ArrowLeft } from 'lucide-react'
 import { erpFetch } from '@/lib/erp-api'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -76,7 +77,28 @@ export default function EmployeeDetailsPage() {
   const [meRole, setMeRole] = useState<string | null>(null)
   const [showDeboardForm, setShowDeboardForm] = useState(false)
   const [showRehireForm, setShowRehireForm] = useState(false)
-  const [showEditContactBank, setShowEditContactBank] = useState(false)
+  const [showEdit, setShowEdit] = useState(false)
+  const [savingEdit, setSavingEdit] = useState(false)
+  const [editForm, setEditForm] = useState({
+    department: '',
+    position: '',
+    date_of_hire: '',
+    salary_ctc: '',
+    salary_in_hand: '',
+    aadhar_card: null as File | null,
+    pan_card: null as File | null,
+    bank_proof: null as File | null,
+    address: '',
+    phone_numbers: '',
+    email: '',
+    account_holder_name: '',
+    bank_name: '',
+    bank_branch: '',
+    ifsc_code: '',
+    account_number: '',
+    is_account_holder_different: false,
+    account_holder_aadhar_card: null as File | null,
+  })
   const [deboardForm, setDeboardForm] = useState({
     reason_type: 'Company initiated Removal',
     reason_description: '',
@@ -99,20 +121,42 @@ export default function EmployeeDetailsPage() {
     bank_proof: null as File | null,
     account_holder_aadhar_card: null as File | null,
   })
-  const [contactBankForm, setContactBankForm] = useState({
-    address: '',
-    phone_numbers: '',
-    email: '',
-    account_holder_name: '',
-    bank_name: '',
-    bank_branch: '',
-    ifsc_code: '',
-    account_number: '',
-    is_account_holder_different: false,
-    account_holder_aadhar_card: null as File | null,
-  })
-
   const isAdmin = useMemo(() => meRole === 'admin', [meRole])
+
+  const salaryEditWarning = useMemo(() => {
+    const ctc = Number(editForm.salary_ctc)
+    const inHand = Number(editForm.salary_in_hand)
+    if (!Number.isFinite(ctc) || !Number.isFinite(inHand) || ctc <= 0 || inHand <= 0) return null
+    return inHand >= ctc ? 'In-hand salary must be less than CTC.' : null
+  }, [editForm.salary_ctc, editForm.salary_in_hand])
+
+  function resetEditForm(data: Employee) {
+    setEditForm({
+      department: data.department ?? '',
+      position: data.position ?? '',
+      date_of_hire: data.date_of_hire ?? '',
+      salary_ctc: data.salary_ctc != null ? String(data.salary_ctc) : '',
+      salary_in_hand: data.salary_in_hand != null ? String(data.salary_in_hand) : '',
+      aadhar_card: null,
+      pan_card: null,
+      bank_proof: null,
+      address: data.contact?.address ?? '',
+      phone_numbers: (data.contact?.phone_numbers ?? []).join(', '),
+      email: data.contact?.email ?? '',
+      account_holder_name: data.bank_details?.account_holder_name ?? '',
+      bank_name: data.bank_details?.bank_name ?? '',
+      bank_branch: data.bank_details?.bank_branch ?? '',
+      ifsc_code: data.bank_details?.ifsc_code ?? '',
+      account_number: data.bank_details?.account_number ?? '',
+      is_account_holder_different: Boolean(data.bank_details?.is_account_holder_different),
+      account_holder_aadhar_card: null,
+    })
+  }
+
+  function closeAuxiliaryForms() {
+    setShowDeboardForm(false)
+    setShowRehireForm(false)
+  }
 
   useEffect(() => {
     const load = async () => {
@@ -124,19 +168,8 @@ export default function EmployeeDetailsPage() {
           erpFetch<{ user: { role: string } }>('/api/me'),
         ])
         setEmployee(res.data)
+        resetEditForm(res.data)
         setMeRole(meRes.user.role)
-        setContactBankForm({
-          address: res.data.contact?.address ?? '',
-          phone_numbers: (res.data.contact?.phone_numbers ?? []).join(', '),
-          email: res.data.contact?.email ?? '',
-          account_holder_name: res.data.bank_details?.account_holder_name ?? '',
-          bank_name: res.data.bank_details?.bank_name ?? '',
-          bank_branch: res.data.bank_details?.bank_branch ?? '',
-          ifsc_code: res.data.bank_details?.ifsc_code ?? '',
-          account_number: res.data.bank_details?.account_number ?? '',
-          is_account_holder_different: Boolean(res.data.bank_details?.is_account_holder_different),
-          account_holder_aadhar_card: null,
-        })
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to load employee')
       } finally {
@@ -149,6 +182,7 @@ export default function EmployeeDetailsPage() {
   const reload = async () => {
     const res = await erpFetch<{ data: Employee }>(`/api/employees/by-code/${params.id}`)
     setEmployee(res.data)
+    resetEditForm(res.data)
   }
 
   const submitDeboard = async (e: FormEvent) => {
@@ -187,31 +221,54 @@ export default function EmployeeDetailsPage() {
     }
   }
 
-  const submitContactBank = async (e: FormEvent) => {
+  const submitEdit = async (e: FormEvent) => {
     e.preventDefault()
+    if (!employee) return
+    if (salaryEditWarning) {
+      setError(salaryEditWarning)
+      return
+    }
+    setSavingEdit(true)
     setError(null)
     try {
-      const payload = new FormData()
-      payload.append('address', contactBankForm.address)
-      payload.append('phone_numbers', contactBankForm.phone_numbers)
-      payload.append('email', contactBankForm.email)
-      payload.append('account_holder_name', contactBankForm.account_holder_name)
-      payload.append('bank_name', contactBankForm.bank_name)
-      payload.append('bank_branch', contactBankForm.bank_branch)
-      payload.append('ifsc_code', contactBankForm.ifsc_code)
-      payload.append('account_number', contactBankForm.account_number)
-      payload.append('is_account_holder_different', String(contactBankForm.is_account_holder_different))
-      if (contactBankForm.account_holder_aadhar_card) {
-        payload.append('account_holder_aadhar_card', contactBankForm.account_holder_aadhar_card)
-      }
-      await erpFetch(`/api/employees/${employee?.id}/contact-bank`, {
+      const employeePayload = new FormData()
+      employeePayload.append('department', editForm.department)
+      employeePayload.append('position', editForm.position.trim())
+      employeePayload.append('date_of_hire', editForm.date_of_hire)
+      employeePayload.append('salary_ctc', editForm.salary_ctc)
+      employeePayload.append('salary_in_hand', editForm.salary_in_hand)
+      if (editForm.aadhar_card) employeePayload.append('aadhar_card', editForm.aadhar_card)
+      if (editForm.pan_card) employeePayload.append('pan_card', editForm.pan_card)
+      if (editForm.bank_proof) employeePayload.append('bank_proof', editForm.bank_proof)
+      await erpFetch(`/api/employees/${employee.id}`, {
         method: 'PUT',
-        body: payload,
+        body: employeePayload,
       })
-      setShowEditContactBank(false)
+
+      const contactPayload = new FormData()
+      contactPayload.append('address', editForm.address)
+      contactPayload.append('phone_numbers', editForm.phone_numbers)
+      contactPayload.append('email', editForm.email)
+      contactPayload.append('account_holder_name', editForm.account_holder_name)
+      contactPayload.append('bank_name', editForm.bank_name)
+      contactPayload.append('bank_branch', editForm.bank_branch)
+      contactPayload.append('ifsc_code', editForm.ifsc_code)
+      contactPayload.append('account_number', editForm.account_number)
+      contactPayload.append('is_account_holder_different', String(editForm.is_account_holder_different))
+      if (editForm.account_holder_aadhar_card) {
+        contactPayload.append('account_holder_aadhar_card', editForm.account_holder_aadhar_card)
+      }
+      await erpFetch(`/api/employees/${employee.id}/contact-bank`, {
+        method: 'PUT',
+        body: contactPayload,
+      })
+
+      setShowEdit(false)
       await reload()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to save contact/bank details')
+      setError(err instanceof Error ? err.message : 'Failed to update employee')
+    } finally {
+      setSavingEdit(false)
     }
   }
 
@@ -229,14 +286,63 @@ export default function EmployeeDetailsPage() {
 
   return (
     <div className="p-8 space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Employee Details</h1>
-          <p className="text-gray-600 mt-1">View full employee information</p>
-        </div>
-        <Button asChild variant="outline">
-          <Link href="/dashboard/hr">Back to Employees</Link>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <Button asChild variant="ghost" className="gap-2 pl-0">
+          <Link href="/dashboard/hr/employees">
+            <ArrowLeft className="size-4" />
+            Back to Employees
+          </Link>
         </Button>
+        {!loading && employee ? (
+          <div className="flex flex-wrap items-center gap-2">
+            {isAdmin ? (
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setShowEdit((v) => {
+                    const next = !v
+                    if (next) {
+                      resetEditForm(employee)
+                      closeAuxiliaryForms()
+                    } else {
+                      resetEditForm(employee)
+                    }
+                    return next
+                  })
+                }}
+              >
+                {showEdit ? 'Cancel edit' : 'Edit'}
+              </Button>
+            ) : null}
+            {employee.status !== 'deboarded' ? (
+              <Button
+                variant="destructive"
+                onClick={() => {
+                  closeAuxiliaryForms()
+                  setShowDeboardForm((v) => !v)
+                  setShowEdit(false)
+                }}
+              >
+                De-board
+              </Button>
+            ) : (
+              <Button
+                onClick={() => {
+                  closeAuxiliaryForms()
+                  setShowRehireForm((v) => !v)
+                  setShowEdit(false)
+                }}
+              >
+                Re-hire
+              </Button>
+            )}
+          </div>
+        ) : null}
+      </div>
+
+      <div>
+        <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Employee Details</h1>
+        <p className="mt-1 text-gray-600 dark:text-muted-foreground">View full employee information</p>
       </div>
 
       {loading ? <p className="text-gray-600">Loading employee...</p> : null}
@@ -278,18 +384,280 @@ export default function EmployeeDetailsPage() {
               <span className="font-medium">Status:</span>{' '}
               {employee.status === 'deboarded' ? 'Deboarded' : 'Active Employee'}
             </p>
-            <div className="md:col-span-2 flex flex-wrap gap-2">
-              {employee.status !== 'deboarded' ? (
-                <Button variant="destructive" onClick={() => setShowDeboardForm((v) => !v)}>
-                  De-board
-                </Button>
-              ) : (
-                <Button onClick={() => setShowRehireForm((v) => !v)}>Re-hire</Button>
-              )}
-              <Button variant="outline" onClick={() => setShowEditContactBank((v) => !v)}>
-                Edit Contact / Bank Details
-              </Button>
-            </div>
+            {!showEdit ? (
+              <>
+                <p className="md:col-span-2 font-medium pt-2">Contact</p>
+                <p>
+                  <span className="font-medium">Address:</span> {employee.contact?.address || '-'}
+                </p>
+                <p>
+                  <span className="font-medium">Phone:</span>{' '}
+                  {(employee.contact?.phone_numbers ?? []).join(', ') || '-'}
+                </p>
+                <p>
+                  <span className="font-medium">Email:</span> {employee.contact?.email || '-'}
+                </p>
+                <p className="md:col-span-2 font-medium pt-2">Bank details</p>
+                <p>
+                  <span className="font-medium">Account holder:</span>{' '}
+                  {employee.bank_details?.account_holder_name || '-'}
+                </p>
+                <p>
+                  <span className="font-medium">Bank:</span> {employee.bank_details?.bank_name || '-'}
+                </p>
+                <p>
+                  <span className="font-medium">Branch:</span> {employee.bank_details?.bank_branch || '-'}
+                </p>
+                <p>
+                  <span className="font-medium">IFSC:</span> {employee.bank_details?.ifsc_code || '-'}
+                </p>
+                <p>
+                  <span className="font-medium">Account number:</span>{' '}
+                  {employee.bank_details?.account_number || '-'}
+                </p>
+                <p>
+                  <span className="font-medium">Different account holder:</span>{' '}
+                  {employee.bank_details?.is_account_holder_different ? 'Yes' : 'No'}
+                </p>
+              </>
+            ) : null}
+
+            {showEdit ? (
+              <form
+                className="md:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-3 border rounded-md p-3"
+                onSubmit={submitEdit}
+              >
+                <p className="md:col-span-2 font-medium">Edit employee</p>
+                <p className="md:col-span-2 text-xs text-muted-foreground">
+                  Name, Employee ID, and Date of Birth cannot be changed after creation.
+                </p>
+                <label className="flex flex-col gap-1">
+                  Employee ID
+                  <input
+                    className="h-10 rounded-md border px-3 bg-muted text-muted-foreground"
+                    value={employee.employee_code}
+                    readOnly
+                    disabled
+                  />
+                </label>
+                <label className="flex flex-col gap-1">
+                  Name
+                  <input
+                    className="h-10 rounded-md border px-3 bg-muted text-muted-foreground"
+                    value={employee.full_name ?? ''}
+                    readOnly
+                    disabled
+                  />
+                </label>
+                <label className="flex flex-col gap-1">
+                  Date of Birth
+                  <input
+                    type="date"
+                    className="h-10 rounded-md border px-3 bg-muted text-muted-foreground"
+                    value={employee.date_of_birth ?? ''}
+                    readOnly
+                    disabled
+                  />
+                </label>
+                <label className="flex flex-col gap-1">
+                  Department
+                  <select
+                    className="h-10 rounded-md border px-3 bg-background"
+                    value={editForm.department}
+                    onChange={(e) => setEditForm((p) => ({ ...p, department: e.target.value }))}
+                    required
+                  >
+                    <option value="">Select department</option>
+                    {departments.map((d) => (
+                      <option key={d} value={d}>
+                        {d}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="flex flex-col gap-1">
+                  Position
+                  <input
+                    className="h-10 rounded-md border px-3 bg-background"
+                    value={editForm.position}
+                    onChange={(e) => setEditForm((p) => ({ ...p, position: e.target.value }))}
+                    required
+                  />
+                </label>
+                <label className="flex flex-col gap-1">
+                  Date of Hire
+                  <input
+                    type="date"
+                    className="h-10 rounded-md border px-3 bg-background"
+                    value={editForm.date_of_hire}
+                    onChange={(e) => setEditForm((p) => ({ ...p, date_of_hire: e.target.value }))}
+                    required
+                  />
+                </label>
+                <label className="flex flex-col gap-1">
+                  Salary (CTC)
+                  <input
+                    type="number"
+                    className="h-10 rounded-md border px-3 bg-background"
+                    value={editForm.salary_ctc}
+                    onChange={(e) => setEditForm((p) => ({ ...p, salary_ctc: e.target.value }))}
+                    required
+                  />
+                </label>
+                <label className="flex flex-col gap-1">
+                  Salary (In Hand)
+                  <input
+                    type="number"
+                    className="h-10 rounded-md border px-3 bg-background"
+                    value={editForm.salary_in_hand}
+                    onChange={(e) => setEditForm((p) => ({ ...p, salary_in_hand: e.target.value }))}
+                    required
+                  />
+                </label>
+                {salaryEditWarning ? (
+                  <p className="md:col-span-2 text-sm text-red-600">{salaryEditWarning}</p>
+                ) : null}
+                <label className="flex flex-col gap-1">
+                  Replace Aadhar Card (optional)
+                  <input
+                    type="file"
+                    onChange={(e) =>
+                      setEditForm((p) => ({ ...p, aadhar_card: e.target.files?.[0] ?? null }))
+                    }
+                  />
+                </label>
+                <label className="flex flex-col gap-1">
+                  Replace PAN Card (optional)
+                  <input
+                    type="file"
+                    onChange={(e) =>
+                      setEditForm((p) => ({ ...p, pan_card: e.target.files?.[0] ?? null }))
+                    }
+                  />
+                </label>
+                <label className="md:col-span-2 flex flex-col gap-1">
+                  Replace Bank Document (optional)
+                  <input
+                    type="file"
+                    onChange={(e) =>
+                      setEditForm((p) => ({ ...p, bank_proof: e.target.files?.[0] ?? null }))
+                    }
+                  />
+                </label>
+
+                <p className="md:col-span-2 font-medium pt-2 border-t">Contact</p>
+                <label className="md:col-span-2 flex flex-col gap-1">
+                  Address
+                  <input
+                    className="h-10 rounded-md border px-3 bg-background"
+                    value={editForm.address}
+                    onChange={(e) => setEditForm((p) => ({ ...p, address: e.target.value }))}
+                    required
+                  />
+                </label>
+                <label className="flex flex-col gap-1">
+                  Phone Numbers (comma separated)
+                  <input
+                    className="h-10 rounded-md border px-3 bg-background"
+                    value={editForm.phone_numbers}
+                    onChange={(e) => setEditForm((p) => ({ ...p, phone_numbers: e.target.value }))}
+                    required
+                  />
+                </label>
+                <label className="flex flex-col gap-1">
+                  Email (optional)
+                  <input
+                    className="h-10 rounded-md border px-3 bg-background"
+                    value={editForm.email}
+                    onChange={(e) => setEditForm((p) => ({ ...p, email: e.target.value }))}
+                  />
+                </label>
+
+                <p className="md:col-span-2 font-medium pt-2 border-t">Bank details</p>
+                <label className="flex flex-col gap-1">
+                  Account Holder Name
+                  <input
+                    className="h-10 rounded-md border px-3 bg-background"
+                    value={editForm.account_holder_name}
+                    onChange={(e) => setEditForm((p) => ({ ...p, account_holder_name: e.target.value }))}
+                    required
+                  />
+                </label>
+                <label className="flex flex-col gap-1">
+                  Bank Name
+                  <input
+                    className="h-10 rounded-md border px-3 bg-background"
+                    value={editForm.bank_name}
+                    onChange={(e) => setEditForm((p) => ({ ...p, bank_name: e.target.value }))}
+                    required
+                  />
+                </label>
+                <label className="flex flex-col gap-1">
+                  Bank Branch
+                  <input
+                    className="h-10 rounded-md border px-3 bg-background"
+                    value={editForm.bank_branch}
+                    onChange={(e) => setEditForm((p) => ({ ...p, bank_branch: e.target.value }))}
+                    required
+                  />
+                </label>
+                <label className="flex flex-col gap-1">
+                  IFSC Code
+                  <input
+                    className="h-10 rounded-md border px-3 bg-background"
+                    value={editForm.ifsc_code}
+                    onChange={(e) => setEditForm((p) => ({ ...p, ifsc_code: e.target.value }))}
+                    required
+                  />
+                </label>
+                <label className="md:col-span-2 flex flex-col gap-1">
+                  Account Number
+                  <input
+                    className="h-10 rounded-md border px-3 bg-background"
+                    value={editForm.account_number}
+                    onChange={(e) => setEditForm((p) => ({ ...p, account_number: e.target.value }))}
+                    required
+                  />
+                </label>
+                <label className="md:col-span-2 flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={editForm.is_account_holder_different}
+                    onChange={(e) =>
+                      setEditForm((p) => ({ ...p, is_account_holder_different: e.target.checked }))
+                    }
+                  />
+                  Is Account holder different from Employee
+                </label>
+                {editForm.is_account_holder_different ? (
+                  <label className="md:col-span-2 flex flex-col gap-1">
+                    Account Holder Aadhar Card
+                    <input
+                      type="file"
+                      onChange={(e) =>
+                        setEditForm((p) => ({ ...p, account_holder_aadhar_card: e.target.files?.[0] ?? null }))
+                      }
+                    />
+                  </label>
+                ) : null}
+
+                <div className="md:col-span-2 flex justify-end gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => {
+                      setShowEdit(false)
+                      resetEditForm(employee)
+                    }}
+                  >
+                    Cancel
+                  </Button>
+                  <Button type="submit" disabled={savingEdit}>
+                    {savingEdit ? 'Saving...' : 'Save changes'}
+                  </Button>
+                </div>
+              </form>
+            ) : null}
 
             {showDeboardForm ? (
               <form className="md:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-3 border rounded-md p-3" onSubmit={submitDeboard}>
@@ -466,107 +834,6 @@ export default function EmployeeDetailsPage() {
                 ) : null}
                 <div className="md:col-span-2 flex justify-end">
                   <Button type="submit">Submit (requires admin approval)</Button>
-                </div>
-              </form>
-            ) : null}
-
-            {showEditContactBank ? (
-              <form className="md:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-3 border rounded-md p-3" onSubmit={submitContactBank}>
-                <p className="md:col-span-2 font-medium">Edit Contact / Bank Details</p>
-                <label className="md:col-span-2 flex flex-col gap-1">
-                  Address
-                  <input
-                    className="h-10 rounded-md border px-3 bg-background"
-                    value={contactBankForm.address}
-                    onChange={(e) => setContactBankForm((p) => ({ ...p, address: e.target.value }))}
-                    required
-                  />
-                </label>
-                <label className="flex flex-col gap-1">
-                  Phone Numbers (comma separated)
-                  <input
-                    className="h-10 rounded-md border px-3 bg-background"
-                    value={contactBankForm.phone_numbers}
-                    onChange={(e) => setContactBankForm((p) => ({ ...p, phone_numbers: e.target.value }))}
-                    required
-                  />
-                </label>
-                <label className="flex flex-col gap-1">
-                  Email (optional)
-                  <input
-                    className="h-10 rounded-md border px-3 bg-background"
-                    value={contactBankForm.email}
-                    onChange={(e) => setContactBankForm((p) => ({ ...p, email: e.target.value }))}
-                  />
-                </label>
-                <label className="flex flex-col gap-1">
-                  Account Holder Name
-                  <input
-                    className="h-10 rounded-md border px-3 bg-background"
-                    value={contactBankForm.account_holder_name}
-                    onChange={(e) => setContactBankForm((p) => ({ ...p, account_holder_name: e.target.value }))}
-                    required
-                  />
-                </label>
-                <label className="flex flex-col gap-1">
-                  Bank Name
-                  <input
-                    className="h-10 rounded-md border px-3 bg-background"
-                    value={contactBankForm.bank_name}
-                    onChange={(e) => setContactBankForm((p) => ({ ...p, bank_name: e.target.value }))}
-                    required
-                  />
-                </label>
-                <label className="flex flex-col gap-1">
-                  Bank Branch
-                  <input
-                    className="h-10 rounded-md border px-3 bg-background"
-                    value={contactBankForm.bank_branch}
-                    onChange={(e) => setContactBankForm((p) => ({ ...p, bank_branch: e.target.value }))}
-                    required
-                  />
-                </label>
-                <label className="flex flex-col gap-1">
-                  IFSC Code
-                  <input
-                    className="h-10 rounded-md border px-3 bg-background"
-                    value={contactBankForm.ifsc_code}
-                    onChange={(e) => setContactBankForm((p) => ({ ...p, ifsc_code: e.target.value }))}
-                    required
-                  />
-                </label>
-                <label className="md:col-span-2 flex flex-col gap-1">
-                  Account Number
-                  <input
-                    className="h-10 rounded-md border px-3 bg-background"
-                    value={contactBankForm.account_number}
-                    onChange={(e) => setContactBankForm((p) => ({ ...p, account_number: e.target.value }))}
-                    required
-                  />
-                </label>
-                <label className="md:col-span-2 flex items-center gap-2">
-                  <input
-                    type="checkbox"
-                    checked={contactBankForm.is_account_holder_different}
-                    onChange={(e) =>
-                      setContactBankForm((p) => ({ ...p, is_account_holder_different: e.target.checked }))
-                    }
-                  />
-                  Is Account holder different from Employee
-                </label>
-                {contactBankForm.is_account_holder_different ? (
-                  <label className="md:col-span-2 flex flex-col gap-1">
-                    Account Holder Aadhar Card
-                    <input
-                      type="file"
-                      onChange={(e) =>
-                        setContactBankForm((p) => ({ ...p, account_holder_aadhar_card: e.target.files?.[0] ?? null }))
-                      }
-                    />
-                  </label>
-                ) : null}
-                <div className="md:col-span-2 flex justify-end">
-                  <Button type="submit">Save Contact / Bank</Button>
                 </div>
               </form>
             ) : null}

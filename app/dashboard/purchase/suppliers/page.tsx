@@ -8,6 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuRadioGroup,
   DropdownMenuRadioItem,
@@ -16,7 +17,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { Input } from '@/components/ui/input'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { Filter, Plus, Search } from 'lucide-react'
+import { EllipsisVertical, Filter, Plus, Search } from 'lucide-react'
 import { erpFetch } from '@/lib/erp-api'
 
 type SupplierTypeFilter = 'all' | 'domestic' | 'international'
@@ -113,12 +114,26 @@ export default function SuppliersPage() {
           <p className="mt-2 text-gray-600">All registered suppliers for purchase operations</p>
         </div>
         {isAdmin && (
-          <Link href="/dashboard/purchase/suppliers/new">
-            <Button className="flex items-center gap-2">
-              <Plus size={18} />
-              Add Supplier
-            </Button>
-          </Link>
+          <div className="flex items-center gap-2">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button type="button" variant="outline" size="icon" aria-label="More supplier actions">
+                  <EllipsisVertical className="size-5" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem asChild>
+                  <Link href="/dashboard/import-export?segment=suppliers">Import/Export Data</Link>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+            <Link href="/dashboard/purchase/suppliers/new">
+              <Button className="flex items-center gap-2">
+                <Plus size={18} />
+                Add Supplier
+              </Button>
+            </Link>
+          </div>
         )}
       </div>
 

@@ -375,7 +375,7 @@ function CreateSalesOrderForm() {
         })
       }
 
-      router.push('/dashboard/sales')
+      router.push('/dashboard/sales/orders')
     } catch (error) {
       console.error('Error creating order:', error)
       alert(error instanceof Error ? error.message : 'Failed to create sales order')
@@ -388,7 +388,7 @@ function CreateSalesOrderForm() {
     <div className="p-8 max-w-6xl">
       <div className="flex items-center gap-4 mb-8">
         <Button variant="ghost" size="sm" asChild className="gap-2">
-          <Link href="/dashboard/sales">
+          <Link href="/dashboard/sales/orders">
             <ArrowLeft size={18} />
             Back
           </Link>
@@ -727,7 +727,7 @@ function CreateSalesOrderForm() {
 
         <div className="flex gap-4">
           <Button type="button" variant="outline" asChild>
-            <Link href="/dashboard/sales">Cancel</Link>
+            <Link href="/dashboard/sales/orders">Cancel</Link>
           </Button>
           <Button type="submit" disabled={loading}>
             {loading ? 'Creating…' : 'Create sales order'}

@@ -108,3 +108,79 @@ export async function erpFetch<T = unknown>(
 
   return body as T
 }
+
+async function getAuthHeaders(isFormData: boolean): Promise<HeadersInit> {
+  const supabase = createClient()
+  const {
+    data: { session },
+  } = await supabase.auth.getSession()
+
+  if (!session?.access_token) {
+    throw new Error('Not authenticated')
+  }
+
+  return {
+    Authorization: `Bearer ${session.access_token}`,
+    ...(isFormData ? {} : { 'Content-Type': 'application/json' }),
+  }
+}
+
+function parseContentDispositionFilename(header: string | null): string | null {
+  if (!header) return null
+  const star = /filename\*=UTF-8''([^;]+)/i.exec(header)
+  if (star?.[1]) {
+    try {
+      return decodeURIComponent(star[1].trim())
+    } catch {
+      return star[1].trim()
+    }
+  }
+  const plain = /filename="?([^";]+)"?/i.exec(header)
+  return plain?.[1]?.trim() ?? null
+}
+
+/** Authenticated fetch that returns a downloadable file (CSV export, sample, etc.). */
+export async function erpFetchBlob(
+  path: string,
+  init: ErpFetchInit = {},
+): Promise<{ blob: Blob; filename: string | null }> {
+  const isFormData = typeof FormData !== 'undefined' && init.body instanceof FormData
+  const normalizedBody =
+    isFormData || init.body == null || typeof init.body === 'string'
+      ? init.body
+      : JSON.stringify(init.body)
+  const url = `${getBaseUrl()}${path.startsWith('/') ? path : `/${path}`}`
+  const res = await fetch(url, {
+    ...init,
+    body: normalizedBody,
+    headers: {
+      ...(await getAuthHeaders(isFormData)),
+      ...(init.headers ?? {}),
+    },
+  })
+
+  if (!res.ok) {
+    const text = await res.text()
+    let body: unknown = null
+    try {
+      body = text ? JSON.parse(text) : null
+    } catch {
+      body = { raw: text }
+    }
+    const msg = extractErrorMessage(body)
+    throw new Error(msg || res.statusText || 'ERP API error')
+  }
+
+  const blob = await res.blob()
+  const filename = parseContentDispositionFilename(res.headers.get('Content-Disposition'))
+  return { blob, filename }
+}
+
+export function downloadBlob(blob: Blob, filename: string) {
+  const url = URL.createObjectURL(blob)
+  const anchor = document.createElement('a')
+  anchor.href = url
+  anchor.download = filename
+  anchor.click()
+  URL.revokeObjectURL(url)
+}

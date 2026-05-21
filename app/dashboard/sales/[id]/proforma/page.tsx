@@ -105,7 +105,7 @@ export default function ProformaInvoicePage() {
     return (
       <div className="p-8 pi-no-print">
         <Button variant="ghost" asChild className="mb-4">
-          <Link href={id ? `/dashboard/sales/${id}` : '/dashboard/sales'}>
+          <Link href={id ? `/dashboard/sales/${id}` : '/dashboard/sales/orders'}>
             <ArrowLeft className="mr-2 size-4" />
             Back
           </Link>

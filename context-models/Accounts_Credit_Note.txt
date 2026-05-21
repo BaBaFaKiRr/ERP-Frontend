@@ -1,0 +1,27 @@
+I want to implement Credit Note object and flow.
+
+Under Accounts tab, add a credit notes page. On this page, we show all credit notes created. Also add a "Create Credit Note"
+button on top right that navigates to "Create Credit Note" page.
+here we ask for details:
+Sales Invoice: Search box
+Entity: autofill from attached Sales invoice
+Date: today immutable
+
+Show items table with search bar for item from Sales invoice
+Columns: SKU, Item, Qty(autofill but mutable), Price(autofill but mutable) (against each row, add a checkbox "item return received")
+
+checkbox: Add customer's Debit Note
+If checked:
+Debit Note Number:
+Debit Note Upload: Upload from device (opt)
+
+Created by: autofill with logged in user's name
+Created at: Today date and time immutable
+                                                                            Create Credit Note
+
+If the user checked "item return received" against any items in items table, create a stock entry against this credit note and 
+credit the item and qty into stock. Also creating credit note also generates a PDF document displaying details of the credit note 
+(refer to the Debit note pdf format) and shows a preview of the same. Also, in statement of accounts, accomodate this credit note.
+I believe you know how this works in a statement of accounts. If we sell an item and create a sales invoice, our amount to collect is 
+X. Now if we issue a credit note of amount Y against the same, our amount to collect is X-Y. Also on Sales invoice details page, show the 
+credit notes if any are linked. 

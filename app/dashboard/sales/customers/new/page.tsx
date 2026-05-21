@@ -17,15 +17,33 @@ import { Textarea } from '@/components/ui/textarea'
 import { ArrowLeft } from 'lucide-react'
 import { erpFetch } from '@/lib/erp-api'
 
-type CustomerType = 'oem' | 'oe' | 'distributor' | 'export' | 'ecommerce' | ''
+type CustomerType = 'oem' | 'oe' | 'distributor' | 'export' | 'ecommerce' | 'retail' | ''
 
 const TYPE_OPTIONS: { value: CustomerType; label: string }[] = [
   { value: 'oem', label: 'OEM' },
   { value: 'oe', label: 'OE' },
   { value: 'distributor', label: 'Distributor' },
   { value: 'export', label: 'Export' },
-  { value: 'ecommerce', label: 'Ecommerce' },
+  { value: 'ecommerce', label: 'EComm' },
+  { value: 'retail', label: 'Retail' },
 ]
+
+function FieldLabel({
+  htmlFor,
+  children,
+  required = false,
+}: {
+  htmlFor?: string
+  children: React.ReactNode
+  required?: boolean
+}) {
+  return (
+    <Label htmlFor={htmlFor} className="mb-1 block text-sm font-medium">
+      {children}
+      {required ? ' *' : null}
+    </Label>
+  )
+}
 
 export default function AddCustomerPage() {
   const router = useRouter()
@@ -66,54 +84,34 @@ export default function AddCustomerPage() {
       return
     }
 
-    let body: Record<string, unknown>
+    if (!companyName.trim()) {
+      alert('Company name is required')
+      return
+    }
+    if (!billingAddress.trim() || !shippingAddress.trim()) {
+      alert('Billing and shipping addresses are required')
+      return
+    }
+    if (customerType === 'ecommerce' && !ecommercePlatform) {
+      alert('Select an e-commerce platform')
+      return
+    }
+    if (customerType === 'distributor' && !gstNo.trim()) {
+      alert('GSTIN is required for Distributor customers')
+      return
+    }
 
-    if (customerType === 'ecommerce') {
-      if (!ecommercePlatform) {
-        alert('Select a platform')
-        return
-      }
-      body = {
-        customer_type: 'ecommerce',
-        ecommerce_platform: ecommercePlatform,
-      }
-    } else {
-      if (!companyName.trim()) {
-        alert('Company name is required')
-        return
-      }
-      if (!billingAddress.trim() || !contactName.trim() || !contactPhone.trim() || !contactEmail.trim()) {
-        alert('Fill billing address, contact name, phone, and email')
-        return
-      }
-      if (!shippingAddress.trim() || !paymentTerms.trim()) {
-        alert('Fill shipping address and payment terms')
-        return
-      }
-      if (customerType !== 'export' && !gstNo.trim()) {
-        alert('GST number is required for OEM, OE, and Distributor')
-        return
-      }
-
-      const base = {
-        name: companyName.trim(),
-        billing_address: billingAddress.trim(),
-        contact_person: contactName.trim(),
-        phone: contactPhone.trim(),
-        email: contactEmail.trim(),
-        shipping_address: shippingAddress.trim(),
-        payment_terms: paymentTerms.trim(),
-      }
-
-      if (customerType === 'export') {
-        body = { customer_type: 'export', ...base }
-      } else {
-        body = {
-          customer_type: customerType,
-          gst_number: gstNo.trim(),
-          ...base,
-        }
-      }
+    const body: Record<string, unknown> = {
+      customer_type: customerType,
+      name: companyName.trim(),
+      billing_address: billingAddress.trim(),
+      shipping_address: shippingAddress.trim(),
+      gst_number: gstNo.trim() || null,
+      ecommerce_platform: customerType === 'ecommerce' ? ecommercePlatform : null,
+      contact_person: contactName.trim() || null,
+      phone: contactPhone.trim() || null,
+      email: contactEmail.trim() || null,
+      payment_terms: paymentTerms.trim() || null,
     }
 
     setLoading(true)
@@ -135,40 +133,38 @@ export default function AddCustomerPage() {
     }
   }
 
-  const showGst = customerType === 'oem' || customerType === 'oe' || customerType === 'distributor'
-  const showBusinessForm =
-    customerType === 'oem' ||
-    customerType === 'oe' ||
-    customerType === 'distributor' ||
-    customerType === 'export'
+  const showGst = customerType === 'distributor'
+  const showPlatform = customerType === 'ecommerce'
+  const showBusinessForm = customerType !== ''
 
   return (
     <div className="p-8 max-w-3xl">
       <div className="flex items-center gap-4 mb-8">
         <Button variant="ghost" size="sm" asChild className="gap-2">
-          <Link href="/dashboard/sales/create">
+          <Link href="/dashboard/sales/customers">
             <ArrowLeft size={18} />
             Back
           </Link>
         </Button>
-        <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Add customer</h1>
+        <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Create customer</h1>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-6">
         <Card>
           <CardHeader>
-            <CardTitle>Customer type</CardTitle>
+            <CardTitle>Customer type *</CardTitle>
             <CardDescription>Choose how this customer is classified.</CardDescription>
           </CardHeader>
           <CardContent>
-            <Label htmlFor="customer_type" className="mb-2 block">
-              Type *
-            </Label>
+            <FieldLabel htmlFor="customer_type" required>
+              Type
+            </FieldLabel>
             <select
               id="customer_type"
               value={customerType}
               onChange={(e) => handleTypeChange(e.target.value as CustomerType)}
-              className="w-full max-w-md px-3 py-2 border border-gray-300 rounded-md bg-white"
+              required
+              className="w-full max-w-md px-3 py-2 border border-gray-300 rounded-md bg-white dark:border-slate-600 dark:bg-slate-900"
             >
               <option value="">Select type…</option>
               {TYPE_OPTIONS.map((o) => (
@@ -180,14 +176,14 @@ export default function AddCustomerPage() {
           </CardContent>
         </Card>
 
-        {customerType === 'ecommerce' && (
+        {showPlatform && (
           <Card>
             <CardHeader>
-              <CardTitle>Platform</CardTitle>
-              <CardDescription>Select where this ecommerce customer sells.</CardDescription>
+              <CardTitle>E-commerce platform *</CardTitle>
+              <CardDescription>Required for EComm customers.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-2">
-              <Label className="block mb-2">Platform *</Label>
+              <FieldLabel required>Platform</FieldLabel>
               <div className="flex flex-col gap-2">
                 {(
                   [
@@ -215,46 +211,82 @@ export default function AddCustomerPage() {
         {showBusinessForm && (
           <Card>
             <CardHeader>
-              <CardTitle>Company details</CardTitle>
+              <CardTitle>Customer details</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <div>
-                <Label htmlFor="company">Company name *</Label>
+                <FieldLabel htmlFor="company" required>
+                  Name
+                </FieldLabel>
                 <Input
                   id="company"
                   value={companyName}
                   onChange={(e) => setCompanyName(e.target.value)}
                   className="mt-1"
                   autoComplete="organization"
+                  required
                 />
               </div>
 
               {showGst && (
                 <div>
-                  <Label htmlFor="gst">GST number *</Label>
+                  <FieldLabel htmlFor="gst" required>
+                    GSTIN
+                  </FieldLabel>
                   <Input
                     id="gst"
                     value={gstNo}
                     onChange={(e) => setGstNo(e.target.value)}
                     className="mt-1"
                     placeholder="15-character GSTIN"
+                    required
+                  />
+                </div>
+              )}
+
+              {!showGst && customerType && customerType !== 'ecommerce' && (
+                <div>
+                  <FieldLabel htmlFor="gst-opt">GSTIN</FieldLabel>
+                  <Input
+                    id="gst-opt"
+                    value={gstNo}
+                    onChange={(e) => setGstNo(e.target.value)}
+                    className="mt-1"
+                    placeholder="Optional"
                   />
                 </div>
               )}
 
               <div>
-                <Label htmlFor="billing">Billing address *</Label>
+                <FieldLabel htmlFor="billing" required>
+                  Billing address
+                </FieldLabel>
                 <Textarea
                   id="billing"
                   value={billingAddress}
                   onChange={(e) => setBillingAddress(e.target.value)}
                   className="mt-1"
                   rows={3}
+                  required
                 />
               </div>
 
               <div>
-                <Label htmlFor="contact_name">Contact person name *</Label>
+                <FieldLabel htmlFor="shipping" required>
+                  Shipping address
+                </FieldLabel>
+                <Textarea
+                  id="shipping"
+                  value={shippingAddress}
+                  onChange={(e) => setShippingAddress(e.target.value)}
+                  className="mt-1"
+                  rows={3}
+                  required
+                />
+              </div>
+
+              <div>
+                <FieldLabel htmlFor="contact_name">Contact person</FieldLabel>
                 <Input
                   id="contact_name"
                   value={contactName}
@@ -264,7 +296,7 @@ export default function AddCustomerPage() {
               </div>
 
               <div>
-                <Label htmlFor="contact_phone">Contact person phone *</Label>
+                <FieldLabel htmlFor="contact_phone">Phone</FieldLabel>
                 <Input
                   id="contact_phone"
                   type="tel"
@@ -275,7 +307,7 @@ export default function AddCustomerPage() {
               </div>
 
               <div>
-                <Label htmlFor="contact_email">Contact person email *</Label>
+                <FieldLabel htmlFor="contact_email">Email</FieldLabel>
                 <Input
                   id="contact_email"
                   type="email"
@@ -286,18 +318,7 @@ export default function AddCustomerPage() {
               </div>
 
               <div>
-                <Label htmlFor="shipping">Shipping address *</Label>
-                <Textarea
-                  id="shipping"
-                  value={shippingAddress}
-                  onChange={(e) => setShippingAddress(e.target.value)}
-                  className="mt-1"
-                  rows={3}
-                />
-              </div>
-
-              <div>
-                <Label htmlFor="terms">Payment terms *</Label>
+                <FieldLabel htmlFor="terms">Payment terms</FieldLabel>
                 <Input
                   id="terms"
                   value={paymentTerms}
@@ -312,7 +333,7 @@ export default function AddCustomerPage() {
 
         <div className="flex gap-3">
           <Button type="button" variant="outline" asChild>
-            <Link href="/dashboard/sales/create">Cancel</Link>
+            <Link href="/dashboard/sales/customers">Cancel</Link>
           </Button>
           <Button type="submit" disabled={loading || !customerType}>
             {loading ? 'Saving…' : 'Submit'}

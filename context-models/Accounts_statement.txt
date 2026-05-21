@@ -1,0 +1,13 @@
+I want to implement a Statement of Account element. This component is entity specific. We can choose a supplier or customer. 
+Then, the tool pulls all purchase/sales invoice + debit notes + payment entries associated with that entity, calculates the net 
+balance.
+
+For an entity (supplier/customer), we can have the following objects:
+1) Sales invoice - We have to collect (in +)
+2) Purchase Invoice - We have to pay (in -)
+3) Debit Note - We have to collect (in +)
+4) Payment Entry - We have paid (in +)
+
+So if we have an Entity A that is a supplier, we can see the total Balance of A with a list of all objects (clickable) for A.
+Now add a "Statement of Account" page under Accounts tab. Here we see an option to search an entity and then retrieve its Statement of account. 
+ 

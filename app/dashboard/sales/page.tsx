@@ -11,16 +11,6 @@ import {
   CardTitle,
 } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuLabel,
-  DropdownMenuRadioGroup,
-  DropdownMenuRadioItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu'
 import {
   Table,
   TableBody,
@@ -29,7 +19,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
-import { ArrowUpDown, Filter, Plus, Search } from 'lucide-react'
+import { Plus, Users } from 'lucide-react'
 import { erpFetch } from '@/lib/erp-api'
 import { cn } from '@/lib/utils'
 
@@ -38,9 +28,16 @@ type SalesOrderRow = {
   order_number: string
   status: string
   order_date: string
-  delivery_date?: string | null
   total_amount?: number | null
   customers?: { id?: string; name: string } | null
+}
+
+type CustomerRow = {
+  id: string
+  name: string
+  gst_number?: string | null
+  customer_type?: string | null
+  created_at?: string | null
 }
 
 const statusLabel: Record<string, string> = {
@@ -48,7 +45,7 @@ const statusLabel: Record<string, string> = {
   pending_approval: 'Pending approval',
   approved: 'Approved',
   pending_work_order: 'Pending work order',
-  work_order_open: 'Manufacturing...',
+  work_order_open: 'Manufacturing…',
   in_progress: 'In progress',
   partially_shipped: 'Partially shipped',
   completed: 'Completed',
@@ -57,33 +54,13 @@ const statusLabel: Record<string, string> = {
   deleted: 'Deleted',
 }
 
-const STATUS_FILTER_KEYS = Object.keys(statusLabel) as Array<keyof typeof statusLabel>
-
-type SalesStatusFilter = 'all' | SalesOrderRow['status']
-
-type SalesSortOption =
-  | 'order_number_asc'
-  | 'order_number_desc'
-  | 'customer_asc'
-  | 'customer_desc'
-  | 'date_asc'
-  | 'date_desc'
-  | 'amount_asc'
-  | 'amount_desc'
-  | 'status_asc'
-  | 'status_desc'
-
-const SORT_LABELS: Record<SalesSortOption, string> = {
-  order_number_asc: 'Order number (A–Z)',
-  order_number_desc: 'Order number (Z–A)',
-  customer_asc: 'Customer (A–Z)',
-  customer_desc: 'Customer (Z–A)',
-  date_asc: 'Order date (oldest first)',
-  date_desc: 'Order date (newest first)',
-  amount_asc: 'Amount (low → high)',
-  amount_desc: 'Amount (high → low)',
-  status_asc: 'Status (A–Z)',
-  status_desc: 'Status (Z–A)',
+const CUSTOMER_TYPE_LABEL: Record<string, string> = {
+  oem: 'OEM',
+  oe: 'OE',
+  distributor: 'Distributor',
+  export: 'Export',
+  ecommerce: 'Ecommerce',
+  retail: 'Retail',
 }
 
 function statusBadgeClass(status: string) {
@@ -94,297 +71,222 @@ function statusBadgeClass(status: string) {
   return 'bg-gray-100 text-gray-800'
 }
 
-function orderMatchesSearch(o: SalesOrderRow, q: string): boolean {
-  const s = q.trim().toLowerCase()
-  if (!s) return true
-  if (o.order_number.toLowerCase().includes(s)) return true
-  if ((o.customers?.name ?? '').toLowerCase().includes(s)) return true
-  if (o.status.toLowerCase().includes(s)) return true
-  if ((statusLabel[o.status] ?? '').toLowerCase().includes(s)) return true
-  const amt = o.total_amount != null ? String(o.total_amount) : ''
-  if (amt.includes(s)) return true
-  return false
-}
-
-function cmpStr(a: string, b: string, dir: 'asc' | 'desc') {
-  const x = a.localeCompare(b, undefined, { sensitivity: 'base' })
-  return dir === 'asc' ? x : -x
-}
-
-function cmpTime(a: string, b: string, dir: 'asc' | 'desc') {
-  const ta = new Date(a).getTime()
-  const tb = new Date(b).getTime()
-  const na = Number.isFinite(ta) ? ta : 0
-  const nb = Number.isFinite(tb) ? tb : 0
-  return dir === 'asc' ? na - nb : nb - na
-}
-
-function cmpNum(a: number, b: number, dir: 'asc' | 'desc') {
-  return dir === 'asc' ? a - b : b - a
-}
-
-export default function SalesOrdersPage() {
+export default function SalesOverviewPage() {
   const router = useRouter()
-  const [searchTerm, setSearchTerm] = useState('')
   const [orders, setOrders] = useState<SalesOrderRow[]>([])
+  const [customers, setCustomers] = useState<CustomerRow[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [statusFilter, setStatusFilter] = useState<SalesStatusFilter>('all')
-  const [sortBy, setSortBy] = useState<SalesSortOption>('date_desc')
 
   useEffect(() => {
-    void load()
+    void (async () => {
+      setLoading(true)
+      setError(null)
+      try {
+        const [ordersRes, customersRes] = await Promise.all([
+          erpFetch<{ data: SalesOrderRow[] }>('/api/sales-orders'),
+          erpFetch<{ data: CustomerRow[] }>('/api/customers?limit=500'),
+        ])
+        setOrders(ordersRes.data ?? [])
+        setCustomers(customersRes.data ?? [])
+      } catch (e) {
+        setError(e instanceof Error ? e.message : 'Failed to load sales overview')
+      } finally {
+        setLoading(false)
+      }
+    })()
   }, [])
 
-  const load = async () => {
-    setLoading(true)
-    setError(null)
-    try {
-      const res = await erpFetch<{ data: SalesOrderRow[] }>('/api/sales-orders')
-      setOrders(res.data ?? [])
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to load')
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const searched = useMemo(
-    () => orders.filter((o) => orderMatchesSearch(o, searchTerm)),
-    [orders, searchTerm],
+  const pendingApprovalCount = useMemo(
+    () => orders.filter((o) => o.status === 'pending_approval').length,
+    [orders],
   )
 
-  const displayed = useMemo(() => {
-    let r = [...searched]
-    if (statusFilter !== 'all') r = r.filter((o) => o.status === statusFilter)
+  const recentOrders = useMemo(
+    () =>
+      [...orders]
+        .sort((a, b) => new Date(b.order_date).getTime() - new Date(a.order_date).getTime())
+        .slice(0, 5),
+    [orders],
+  )
 
-    const dir = sortBy.endsWith('_desc') ? 'desc' : 'asc'
-    const key = sortBy.replace(/_asc$|_desc$/, '') as string
-
-    r.sort((a, b) => {
-      switch (key) {
-        case 'order_number':
-          return cmpStr(a.order_number, b.order_number, dir)
-        case 'customer':
-          return cmpStr(a.customers?.name ?? '', b.customers?.name ?? '', dir)
-        case 'date':
-          return cmpTime(a.order_date, b.order_date, dir)
-        case 'amount': {
-          const na = a.total_amount == null ? (dir === 'asc' ? Infinity : -Infinity) : Number(a.total_amount)
-          const nb = b.total_amount == null ? (dir === 'asc' ? Infinity : -Infinity) : Number(b.total_amount)
-          return cmpNum(na, nb, dir)
-        }
-        case 'status':
-          return cmpStr(statusLabel[a.status] ?? a.status, statusLabel[b.status] ?? b.status, dir)
-        default:
-          return 0
-      }
-    })
-    return r
-  }, [searched, statusFilter, sortBy])
-
-  const filterActive = statusFilter !== 'all'
+  const recentCustomers = useMemo(
+    () =>
+      [...customers]
+        .sort((a, b) => new Date(b.created_at ?? 0).getTime() - new Date(a.created_at ?? 0).getTime())
+        .slice(0, 5),
+    [customers],
+  )
 
   return (
     <div className="p-8">
-      <div className="flex justify-between items-start mb-8">
+      <div className="mb-8 flex items-start justify-between">
         <div>
-          <h1 className="text-4xl font-bold text-gray-900 dark:text-white">Sales orders</h1>
-          <p className="text-gray-600 mt-2">Create and approve sales orders (SL-YYYY-NNNNN)</p>
+          <h1 className="text-4xl font-bold text-gray-900 dark:text-white">Sales</h1>
+          <p className="mt-2 text-gray-600">Orders, customers, and sales pipeline</p>
         </div>
-        <Button asChild className="flex items-center gap-2">
-          <Link href="/dashboard/sales/create">
-            <Plus size={18} />
-            Create sales order
-          </Link>
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button variant="outline" asChild className="gap-2">
+            <Link href="/dashboard/sales/customers">
+              <Users size={18} />
+              Customers
+            </Link>
+          </Button>
+          <Button asChild className="gap-2">
+            <Link href="/dashboard/sales/create">
+              <Plus size={18} />
+              Create sales order
+            </Link>
+          </Button>
+        </div>
       </div>
 
-      {error && (
-        <p className="text-sm text-red-600 mb-4">
-          {error}. Set NEXT_PUBLIC_ERP_API_URL and run ERP-Backend.
-        </p>
-      )}
+      {error && <p className="mb-4 text-sm text-red-600">{error}</p>}
 
-      <Card className="mb-8">
-        <CardHeader>
-          <CardTitle>Pipeline</CardTitle>
-          <CardDescription>
-            Sales order → approval (unless admin) → work order → manufacturing → invoice → payment.
-            Rejected and deleted orders stay visible in the list for audit.
-          </CardDescription>
-        </CardHeader>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Orders</CardTitle>
-          <CardDescription>
-            {!loading && (
-              <span className="block text-xs text-muted-foreground mt-1">
-                Showing {displayed.length} of {orders.length} orders
-                {searchTerm.trim() ? ` · matching “${searchTerm.trim()}”` : ''}
-                {filterActive || sortBy !== 'date_desc' ? ` · ${SORT_LABELS[sortBy]}` : ''}
+      <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
+        <Card className="border-border/70 bg-card/70 backdrop-blur-sm">
+          <CardHeader className="pb-2">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <CardTitle className="text-xl font-bold">
+                  <Link href="/dashboard/sales/orders" className="hover:underline">
+                    Sales Orders
+                  </Link>
+                </CardTitle>
+                <CardDescription>Recent orders and pending approvals</CardDescription>
+              </div>
+              <span className="rounded-full bg-amber-500/15 px-2.5 py-1 text-sm font-semibold text-amber-700 dark:text-amber-300">
+                {loading ? '—' : `${pendingApprovalCount} pending`}
               </span>
-            )}
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="mb-6 flex flex-col gap-3 lg:flex-row lg:items-center">
-            <div className="flex-1 relative min-w-0">
-              <Search className="absolute left-3 top-3 text-gray-400" size={18} />
-              <Input
-                placeholder="Search order number, customer, status, or amount…"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10"
-              />
             </div>
-            <div className="flex flex-wrap gap-2 shrink-0">
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button type="button" variant="outline" className="gap-2">
-                    <Filter className="size-4" />
-                    Filter
-                    {filterActive ? (
-                      <span className="ml-1 rounded-full bg-primary/15 px-1.5 text-[10px] font-medium text-primary">
-                        on
-                      </span>
-                    ) : null}
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="max-h-[min(24rem,70vh)] w-56 overflow-y-auto">
-                  <DropdownMenuLabel>Status</DropdownMenuLabel>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuRadioGroup
-                    value={statusFilter}
-                    onValueChange={(v) => setStatusFilter(v as SalesStatusFilter)}
-                  >
-                    <DropdownMenuRadioItem value="all">All statuses</DropdownMenuRadioItem>
-                    {STATUS_FILTER_KEYS.map((k) => (
-                      <DropdownMenuRadioItem key={k} value={k}>
-                        {statusLabel[k]}
-                      </DropdownMenuRadioItem>
-                    ))}
-                  </DropdownMenuRadioGroup>
-                </DropdownMenuContent>
-              </DropdownMenu>
-
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button type="button" variant="outline" className="gap-2">
-                    <ArrowUpDown className="size-4" />
-                    Sort
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-56">
-                  <DropdownMenuLabel>Sort by</DropdownMenuLabel>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuRadioGroup value={sortBy} onValueChange={(v) => setSortBy(v as SalesSortOption)}>
-                    <DropdownMenuRadioItem value="date_desc">{SORT_LABELS.date_desc}</DropdownMenuRadioItem>
-                    <DropdownMenuRadioItem value="date_asc">{SORT_LABELS.date_asc}</DropdownMenuRadioItem>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuRadioItem value="order_number_asc">{SORT_LABELS.order_number_asc}</DropdownMenuRadioItem>
-                    <DropdownMenuRadioItem value="order_number_desc">{SORT_LABELS.order_number_desc}</DropdownMenuRadioItem>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuRadioItem value="customer_asc">{SORT_LABELS.customer_asc}</DropdownMenuRadioItem>
-                    <DropdownMenuRadioItem value="customer_desc">{SORT_LABELS.customer_desc}</DropdownMenuRadioItem>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuRadioItem value="amount_desc">{SORT_LABELS.amount_desc}</DropdownMenuRadioItem>
-                    <DropdownMenuRadioItem value="amount_asc">{SORT_LABELS.amount_asc}</DropdownMenuRadioItem>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuRadioItem value="status_asc">{SORT_LABELS.status_asc}</DropdownMenuRadioItem>
-                    <DropdownMenuRadioItem value="status_desc">{SORT_LABELS.status_desc}</DropdownMenuRadioItem>
-                  </DropdownMenuRadioGroup>
-                </DropdownMenuContent>
-              </DropdownMenu>
-
-              <Button type="button" variant="outline" onClick={() => void load()}>
-                Refresh
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex flex-wrap gap-2">
+              <Button asChild size="sm" variant="outline">
+                <Link href="/dashboard/sales/orders">View all orders</Link>
               </Button>
+              {pendingApprovalCount > 0 ? (
+                <Button asChild size="sm" variant="outline">
+                  <Link href="/dashboard/sales/orders?status=pending_approval">Pending approval</Link>
+                </Button>
+              ) : null}
             </div>
-          </div>
-
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow className="bg-muted/40 dark:bg-muted/20 hover:bg-muted/40 dark:hover:bg-muted/20">
-                  <TableHead>Order</TableHead>
-                  <TableHead>Customer</TableHead>
-                  <TableHead>Date</TableHead>
-                  <TableHead className="text-right">Amount (INR)</TableHead>
-                  <TableHead>Status</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {loading ? (
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
                   <TableRow>
-                    <TableCell colSpan={5}>Loading…</TableCell>
+                    <TableHead>Order</TableHead>
+                    <TableHead>Customer</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead className="text-right">Amount</TableHead>
                   </TableRow>
-                ) : displayed.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={5}>
-                      {orders.length === 0
-                        ? 'No sales orders yet.'
-                        : 'No orders match your search or filters.'}
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  displayed.map((order) => (
-                    <TableRow
-                      key={order.id}
-                      className={cn(
-                        'cursor-pointer',
-                        order.status === 'deleted' && 'opacity-70',
-                      )}
-                      onClick={() => router.push(`/dashboard/sales/${order.id}`)}
-                    >
-                      <TableCell className="font-mono font-semibold">
-                        <Link
-                          href={`/dashboard/sales/${order.id}`}
-                          className="text-primary hover:underline"
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          {order.order_number}
-                        </Link>
-                      </TableCell>
-                      <TableCell>
-                        {order.customers?.id ? (
-                          <Link
-                            href={`/dashboard/sales/customers/${order.customers.id}`}
-                            className="text-primary hover:underline"
-                            onClick={(e) => e.stopPropagation()}
-                          >
-                            {order.customers.name}
-                          </Link>
-                        ) : (
-                          order.customers?.name ?? '—'
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        {order.order_date ? new Date(order.order_date).toLocaleDateString('en-GB') : '—'}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        {order.total_amount != null ? `₹${Number(order.total_amount).toFixed(2)}` : '—'}
-                      </TableCell>
-                      <TableCell>
-                        <span
-                          className={cn(
-                            'text-xs px-3 py-1 rounded-full font-medium',
-                            statusBadgeClass(order.status),
-                          )}
-                        >
-                          {statusLabel[order.status] ?? order.status}
-                        </span>
-                      </TableCell>
+                </TableHeader>
+                <TableBody>
+                  {loading ? (
+                    <TableRow>
+                      <TableCell colSpan={4}>Loading…</TableCell>
                     </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          </div>
-        </CardContent>
-      </Card>
+                  ) : recentOrders.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={4}>No sales orders yet.</TableCell>
+                    </TableRow>
+                  ) : (
+                    recentOrders.map((order) => (
+                      <TableRow
+                        key={order.id}
+                        className="cursor-pointer hover:bg-gray-50 dark:hover:bg-slate-800/40"
+                        onClick={() => router.push(`/dashboard/sales/${order.id}`)}
+                      >
+                        <TableCell className="font-mono font-medium">{order.order_number}</TableCell>
+                        <TableCell>{order.customers?.name ?? '—'}</TableCell>
+                        <TableCell>
+                          <span
+                            className={cn(
+                              'rounded-full px-2 py-0.5 text-xs font-medium',
+                              statusBadgeClass(order.status),
+                            )}
+                          >
+                            {statusLabel[order.status] ?? order.status}
+                          </span>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          {order.total_amount != null
+                            ? `₹${Number(order.total_amount).toFixed(2)}`
+                            : '—'}
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="border-border/70 bg-card/70 backdrop-blur-sm">
+          <CardHeader className="pb-2">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <CardTitle className="text-xl font-bold">
+                  <Link href="/dashboard/sales/customers" className="hover:underline">
+                    Customers
+                  </Link>
+                </CardTitle>
+                <CardDescription>Registered customers for sales</CardDescription>
+              </div>
+              <span className="rounded-full bg-primary/15 px-2.5 py-1 text-sm font-semibold text-primary">
+                {loading ? '—' : customers.length}
+              </span>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <Button asChild size="sm" variant="outline" className="gap-2">
+              <Link href="/dashboard/sales/customers/new">
+                <Plus size={16} />
+                Add customer
+              </Link>
+            </Button>
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Name</TableHead>
+                    <TableHead>Type</TableHead>
+                    <TableHead>GST</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {loading ? (
+                    <TableRow>
+                      <TableCell colSpan={3}>Loading…</TableCell>
+                    </TableRow>
+                  ) : recentCustomers.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={3}>No customers yet.</TableCell>
+                    </TableRow>
+                  ) : (
+                    recentCustomers.map((customer) => (
+                      <TableRow
+                        key={customer.id}
+                        className="cursor-pointer hover:bg-gray-50 dark:hover:bg-slate-800/40"
+                        onClick={() => router.push(`/dashboard/sales/customers/${customer.id}`)}
+                      >
+                        <TableCell className="font-medium">{customer.name}</TableCell>
+                        <TableCell>
+                          {customer.customer_type
+                            ? CUSTOMER_TYPE_LABEL[customer.customer_type] ?? customer.customer_type
+                            : '—'}
+                        </TableCell>
+                        <TableCell>{customer.gst_number ?? '—'}</TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
     </div>
   )
 }
