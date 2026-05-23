@@ -28,6 +28,12 @@ import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { useTheme } from 'next-themes'
 import { LEJER_LOGO_MARK_SRC } from '@/lib/branding'
+import { AssistantPanel, AssistantTrigger } from '@/components/assistant/AssistantPanel'
+import {
+  ResizableHandle,
+  ResizablePanel,
+  ResizablePanelGroup,
+} from '@/components/ui/resizable'
 
 const INVENTORY_CHILDREN = [
   { name: 'Items', href: '/dashboard/inventory/items' },
@@ -583,6 +589,81 @@ function HRSidebarSection({ sidebarOpen }: { sidebarOpen: boolean }) {
 }
 
 const COLORFUL_ACCENTS_LS_KEY = 'erp-dashboard-colorful-accents'
+const ASSISTANT_LAYOUT_LS_KEY = 'erp-assistant-panel-layout'
+
+function DashboardHeader({
+  mounted,
+  resolvedTheme,
+  colorfulAccents,
+  toggleColorfulAccents,
+  setTheme,
+  assistantOpen,
+  onToggleAssistant,
+}: {
+  mounted: boolean
+  resolvedTheme: string | undefined
+  colorfulAccents: boolean
+  toggleColorfulAccents: () => void
+  setTheme: (theme: string) => void
+  assistantOpen: boolean
+  onToggleAssistant: () => void
+}) {
+  return (
+    <header className="flex h-16 shrink-0 items-center justify-between border-b border-border/60 px-6">
+      <div className="flex items-center gap-2">
+        <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">LEJER</p>
+      </div>
+      <div className="flex items-center gap-2">
+        <AssistantTrigger active={assistantOpen} onClick={onToggleAssistant} />
+        {mounted && resolvedTheme === 'dark' ? (
+          <Button
+            type="button"
+            variant={colorfulAccents ? 'secondary' : 'outline'}
+            className="rounded-xl border-border/70 bg-background/60"
+            onClick={toggleColorfulAccents}
+            aria-pressed={colorfulAccents}
+            aria-label={
+              colorfulAccents
+                ? 'Turn off purple and green background accents'
+                : 'Turn on purple and green background accents'
+            }
+          >
+            Colorful
+          </Button>
+        ) : null}
+        <Button
+          type="button"
+          variant="outline"
+          className="rounded-xl border-border/70 bg-background/60"
+          onClick={() => setTheme(resolvedTheme === 'dark' ? 'light' : 'dark')}
+          aria-label="Toggle theme"
+        >
+          {mounted && resolvedTheme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
+          <span>{mounted && resolvedTheme === 'dark' ? 'Light mode' : 'Dark mode'}</span>
+        </Button>
+      </div>
+    </header>
+  )
+}
+
+function readAssistantLayout(): number[] | undefined {
+  if (typeof window === 'undefined') return undefined
+  try {
+    const raw = localStorage.getItem(ASSISTANT_LAYOUT_LS_KEY)
+    if (!raw) return undefined
+    const parsed = JSON.parse(raw) as unknown
+    if (
+      Array.isArray(parsed) &&
+      parsed.length === 2 &&
+      parsed.every((n) => typeof n === 'number' && n > 0)
+    ) {
+      return parsed as number[]
+    }
+  } catch {
+    /* ignore */
+  }
+  return undefined
+}
 
 export default function DashboardLayout({
   children,
@@ -590,6 +671,8 @@ export default function DashboardLayout({
   children: React.ReactNode
 }) {
   const [sidebarOpen, setSidebarOpen] = useState(true)
+  const [assistantOpen, setAssistantOpen] = useState(false)
+  const [assistantLayout, setAssistantLayout] = useState<number[] | undefined>(undefined)
   const [mounted, setMounted] = useState(false)
   const [colorfulAccents, setColorfulAccents] = useState(true)
   const router = useRouter()
@@ -607,6 +690,7 @@ export default function DashboardLayout({
     if (stored !== null) {
       setColorfulAccents(stored === 'true')
     }
+    setAssistantLayout(readAssistantLayout())
   }, [mounted])
 
   const handleLogout = async () => {
@@ -716,38 +800,65 @@ export default function DashboardLayout({
         </div>
       </aside>
 
-      <main className="flex-1 overflow-hidden rounded-2xl border border-border/50 bg-background/75 backdrop-blur-xl dark:border-white/10 dark:bg-transparent dark:shadow-none dark:backdrop-blur-none">
-        <header className="flex h-16 items-center justify-between border-b border-border/60 px-6">
-          <div className="flex items-center gap-2">
-            <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">LEJER</p>
-          </div>
-          <div className="flex items-center gap-2">
-            {mounted && resolvedTheme === 'dark' ? (
-              <Button
-                type="button"
-                variant={colorfulAccents ? 'secondary' : 'outline'}
-                className="rounded-xl border-border/70 bg-background/60"
-                onClick={toggleColorfulAccents}
-                aria-pressed={colorfulAccents}
-                aria-label={colorfulAccents ? 'Turn off purple and green background accents' : 'Turn on purple and green background accents'}
-              >
-                Colorful
-              </Button>
-            ) : null}
-            <Button
-              type="button"
-              variant="outline"
-              className="rounded-xl border-border/70 bg-background/60"
-              onClick={() => setTheme(resolvedTheme === 'dark' ? 'light' : 'dark')}
-              aria-label="Toggle theme"
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-2xl border border-border/50 bg-background/75 backdrop-blur-xl dark:border-white/10 dark:bg-transparent dark:shadow-none dark:backdrop-blur-none">
+        {assistantOpen ? (
+          <ResizablePanelGroup
+            direction="horizontal"
+            className="h-full min-h-0"
+            onLayout={(sizes) => {
+              if (sizes.length === 2) {
+                setAssistantLayout(sizes)
+                localStorage.setItem(ASSISTANT_LAYOUT_LS_KEY, JSON.stringify(sizes))
+              }
+            }}
+          >
+            <ResizablePanel
+              id="dashboard-main"
+              order={1}
+              defaultSize={assistantLayout?.[0] ?? 72}
+              minSize={35}
+              className="min-w-0"
             >
-              {mounted && resolvedTheme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
-              <span>{mounted && resolvedTheme === 'dark' ? 'Light mode' : 'Dark mode'}</span>
-            </Button>
-          </div>
-        </header>
-        <div className="h-[calc(100%-4rem)] overflow-auto">{children}</div>
-      </main>
+              <main className="flex h-full min-h-0 flex-col overflow-hidden">
+                <DashboardHeader
+                  mounted={mounted}
+                  resolvedTheme={resolvedTheme}
+                  colorfulAccents={colorfulAccents}
+                  toggleColorfulAccents={toggleColorfulAccents}
+                  setTheme={setTheme}
+                  assistantOpen={assistantOpen}
+                  onToggleAssistant={() => setAssistantOpen((o) => !o)}
+                />
+                <div className="min-h-0 flex-1 overflow-auto">{children}</div>
+              </main>
+            </ResizablePanel>
+            <ResizableHandle withHandle className="bg-border/80" />
+            <ResizablePanel
+              id="dashboard-assistant"
+              order={2}
+              defaultSize={assistantLayout?.[1] ?? 28}
+              minSize={18}
+              maxSize={55}
+              className="min-w-0"
+            >
+              <AssistantPanel onClose={() => setAssistantOpen(false)} />
+            </ResizablePanel>
+          </ResizablePanelGroup>
+        ) : (
+          <main className="flex h-full min-h-0 flex-col overflow-hidden">
+            <DashboardHeader
+              mounted={mounted}
+              resolvedTheme={resolvedTheme}
+              colorfulAccents={colorfulAccents}
+              toggleColorfulAccents={toggleColorfulAccents}
+              setTheme={setTheme}
+              assistantOpen={assistantOpen}
+              onToggleAssistant={() => setAssistantOpen(true)}
+            />
+            <div className="min-h-0 flex-1 overflow-auto">{children}</div>
+          </main>
+        )}
+      </div>
       </div>
     </div>
   )

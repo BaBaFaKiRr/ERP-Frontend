@@ -30,12 +30,14 @@ pnpm install
 ```
 
 ### Step 3: Set Up Environment Variables
-Create `.env.local` file with:
+Create `.env.local` in `ERP-Frontend` with:
 ```
 NEXT_PUBLIC_SUPABASE_URL=your-url
-NEXT_PUBLIC_SUPABASE_ANON_KEY=your-key
-SUPABASE_SERVICE_ROLE_KEY=your-key
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
+NEXT_PUBLIC_ERP_API_URL=http://localhost:4000
 ```
+
+Configure **ERP-Backend** separately (`.env` with `SUPABASE_SERVICE_ROLE_KEY`, etc.). Company/bank details for proforma and PDFs are managed under **Finance → Settings**, not in frontend env.
 
 ### Step 4: Run Development Server
 ```bash

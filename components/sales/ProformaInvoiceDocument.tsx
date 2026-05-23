@@ -1,4 +1,4 @@
-import { getProformaCompany } from '@/lib/proforma-company'
+import type { ProformaCompanyBlock } from '@/lib/proforma-company-types'
 import { inrRupeesToWords } from '@/lib/inr-words'
 
 const GST_RATE = 0.18
@@ -15,6 +15,7 @@ export type ProformaLine = {
 }
 
 type Props = {
+  company: ProformaCompanyBlock
   /** Shown as "Quo No." — equals sales order number */
   salesOrderNumber: string
   /** PI date (typically today when generating) */
@@ -33,6 +34,7 @@ function formatPiDate(d: Date) {
 }
 
 export function ProformaInvoiceDocument({
+  company,
   salesOrderNumber,
   documentDate,
   validUntil,
@@ -42,7 +44,6 @@ export function ProformaInvoiceDocument({
   phone,
   lines,
 }: Props) {
-  const company = getProformaCompany()
 
   const subtotal = lines.reduce((s, l) => s + (Number(l.line_total) || 0), 0)
   const igstTotal = Math.round(subtotal * GST_RATE * 100) / 100

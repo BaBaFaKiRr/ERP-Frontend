@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { useParams } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { ProformaInvoiceDocument, type ProformaLine } from '@/components/sales/ProformaInvoiceDocument'
+import type { ProformaCompanyBlock } from '@/lib/proforma-company-types'
 import { ArrowLeft, FileDown } from 'lucide-react'
 import { erpFetch } from '@/lib/erp-api'
 import { downloadProformaPdf } from '@/lib/proforma-pdf'
@@ -48,6 +49,7 @@ export default function ProformaInvoicePage() {
   const id = typeof params.id === 'string' ? params.id : ''
 
   const [order, setOrder] = useState<SalesOrderPayload | null>(null)
+  const [company, setCompany] = useState<ProformaCompanyBlock | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [pdfBusy, setPdfBusy] = useState(false)
@@ -65,11 +67,16 @@ export default function ProformaInvoicePage() {
     setLoading(true)
     setError(null)
     try {
-      const res = await erpFetch<{ data: SalesOrderPayload }>(`/api/sales-orders/${id}`)
-      setOrder(res.data ?? null)
+      const [orderRes, companyRes] = await Promise.all([
+        erpFetch<{ data: SalesOrderPayload }>(`/api/sales-orders/${id}`),
+        erpFetch<{ data: ProformaCompanyBlock }>('/api/invoice-settings/default/company'),
+      ])
+      setOrder(orderRes.data ?? null)
+      setCompany(companyRes.data ?? null)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to load order')
       setOrder(null)
+      setCompany(null)
     } finally {
       setLoading(false)
     }
@@ -95,13 +102,13 @@ export default function ProformaInvoicePage() {
     }
   }
 
-  if (loading && !order) {
+  if (loading && (!order || !company)) {
     return (
       <div className="p-8 text-muted-foreground pi-no-print">Loading proforma…</div>
     )
   }
 
-  if (error || !order) {
+  if (error || !order || !company) {
     return (
       <div className="p-8 pi-no-print">
         <Button variant="ghost" asChild className="mb-4">
@@ -165,6 +172,7 @@ export default function ProformaInvoicePage() {
           className="w-[210mm] max-w-[calc(100vw-2rem)] shrink-0 bg-white text-black shadow-[0_2px_14px_rgba(0,0,0,0.1)] border border-neutral-300/90 overflow-hidden box-border print:shadow-none print:border-0 print:max-w-none"
         >
           <ProformaInvoiceDocument
+            company={company}
             salesOrderNumber={order.order_number}
             documentDate={documentDate}
             validUntil={validUntil}

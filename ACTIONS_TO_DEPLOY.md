@@ -63,13 +63,12 @@ This is your **COMPLETE ACTION LIST** to fully deploy the Manufacturing ERP syst
 - [ ] Open your project folder in code editor (VS Code recommended)
 - [ ] Right-click in the root folder (same level as package.json)
 - [ ] Create new file: `.env.local` (note the dot at start)
-- [ ] Add these 4 lines (copy values from Supabase):
+- [ ] Add these lines (Supabase auth + ERP API URL):
 
 ```
 NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
-SUPABASE_SERVICE_ROLE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
-POSTGRES_URL_NON_POOLING=postgresql://postgres:password@...
+NEXT_PUBLIC_ERP_API_URL=https://your-erp-backend.example.com
 ```
 
 **Where to get values:**
@@ -79,13 +78,13 @@ POSTGRES_URL_NON_POOLING=postgresql://postgres:password@...
 - [ ] Click: "API" tab
 - [ ] Copy **Project URL** → `NEXT_PUBLIC_SUPABASE_URL`
 - [ ] Copy **anon public key** → `NEXT_PUBLIC_SUPABASE_ANON_KEY`
-- [ ] Copy **service_role secret key** → `SUPABASE_SERVICE_ROLE_KEY`
-- [ ] Go to: Settings → "Database"
-- [ ] Copy non-pooling connection string → `POSTGRES_URL_NON_POOLING`
+- [ ] Set `NEXT_PUBLIC_ERP_API_URL` to your deployed **ERP-Backend** base URL
+
+**ERP-Backend** (separate `.env`, not in the Next.js app): `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `CORS_ORIGIN`. Company/bank for invoices: **Finance → Settings** in the app (database), not frontend env.
 
 **Verification:**
-- [ ] File exists: `.env.local` in root folder
-- [ ] File has 4 lines of variables
+- [ ] File exists: `.env.local` in `ERP-Frontend`
+- [ ] File has Supabase URL, anon key, and ERP API URL
 - [ ] No quotation marks around values
 - [ ] No extra spaces before/after values
 
@@ -365,11 +364,10 @@ SELECT id, 30, 10, 'Warehouse C' FROM products WHERE code = 'PROD-004';
 - [ ] Click "Add New..." → "Project"
 - [ ] Import your GitHub repository
 - [ ] Vercel will auto-detect Next.js
-- [ ] Add Environment Variables (same 4 from .env.local):
+- [ ] Add Environment Variables (from `.env.local`):
   - NEXT_PUBLIC_SUPABASE_URL
   - NEXT_PUBLIC_SUPABASE_ANON_KEY
-  - SUPABASE_SERVICE_ROLE_KEY
-  - POSTGRES_URL_NON_POOLING
+  - NEXT_PUBLIC_ERP_API_URL
 - [ ] Click "Deploy"
 - [ ] ✅ Vercel will deploy automatically
 

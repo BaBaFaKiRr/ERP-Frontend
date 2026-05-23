@@ -33,13 +33,18 @@ cd manufacturing-erp
 
 2. **Create a new file named `.env.local`** in the root directory (same level as package.json)
 
-3. **Copy these variable names:**
+3. **Copy these variable names** (frontend only — no company/proforma vars here):
 ```
 NEXT_PUBLIC_SUPABASE_URL=
 NEXT_PUBLIC_SUPABASE_ANON_KEY=
-SUPABASE_SERVICE_ROLE_KEY=
-POSTGRES_URL_NON_POOLING=
+NEXT_PUBLIC_ERP_API_URL=http://localhost:4000
 ```
+
+Optional (local auth redirects): `NEXT_PUBLIC_DEV_SUPABASE_REDIRECT_URL`
+
+**ERP-Backend** uses its own `.env` (`SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `CORS_ORIGIN`, etc.). Seller/company details for invoices live in **Finance → Settings** (`invoice_settings_profiles` in the database), not in frontend env.
+
+Legacy optional (backend only, migration fallback): `PI_COMPANY_NAME`, `PI_COMPANY_ADDRESS`, etc.
 
 4. **Get the values from Supabase:**
    - Go to: https://supabase.com/dashboard
@@ -57,13 +62,14 @@ POSTGRES_URL_NON_POOLING=
    - Copy the non-pooling connection string
    - OR leave it empty for now (not required if using HTTP)
 
-6. **Your .env.local should look like:**
+6. **Your `.env.local` should look like:**
 ```
 NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
-SUPABASE_SERVICE_ROLE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
-POSTGRES_URL_NON_POOLING=postgresql://postgres:password@...
+NEXT_PUBLIC_ERP_API_URL=http://localhost:4000
 ```
+
+The frontend talks to Supabase **for authentication only** (login/session). Business data and document seller details come from **ERP-Backend**.
 
 ### Step 3: Create Database Tables
 
