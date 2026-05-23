@@ -1,650 +1,21 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import Image from 'next/image'
-import Link from 'next/link'
-import { usePathname } from 'next/navigation'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-import {
-  LayoutDashboard,
-  Package,
-  ShoppingCart,
-  Package2,
-  Factory,
-  Truck,
-  DollarSign,
-  Users,
-  Settings,
-  LogOut,
-  Menu,
-  X,
-  ChevronDown,
-  ChevronRight,
-  Sun,
-  Moon,
-} from 'lucide-react'
-import { Button } from '@/components/ui/button'
-import { cn } from '@/lib/utils'
 import { useTheme } from 'next-themes'
-import { LEJER_LOGO_MARK_SRC } from '@/lib/branding'
-import { AssistantPanel, AssistantTrigger } from '@/components/assistant/AssistantPanel'
+import { cn } from '@/lib/utils'
+import { AppSidebar } from '@/components/layout/app-sidebar'
+import { AppTopBar } from '@/components/layout/app-topbar'
+import { AssistantPanel } from '@/components/assistant/AssistantPanel'
 import {
   ResizableHandle,
   ResizablePanel,
   ResizablePanelGroup,
 } from '@/components/ui/resizable'
+import { erpFetch } from '@/lib/erp-api'
 
-const INVENTORY_CHILDREN = [
-  { name: 'Items', href: '/dashboard/inventory/items' },
-  { name: 'BOM', href: '/dashboard/inventory/bom' },
-  { name: 'Stock', href: '/dashboard/inventory' },
-  { name: 'Stock entries', href: '/dashboard/inventory/stock-entries' },
-  { name: 'Scrap', href: '/dashboard/inventory/scrap' },
-  { name: 'Material Issue Requests', href: '/dashboard/inventory/material-issue-requests' },
-  { name: 'Deposit Requests', href: '/dashboard/inventory/deposit-requests' },
-] as const
-
-const MANUFACTURING_CHILDREN = [
-  { name: 'Production', href: '/dashboard/manufacturing/production' },
-  { name: 'Sales Orders', href: '/dashboard/manufacturing' },
-  { name: 'Planning', href: '/dashboard/manufacturing/planning' },
-  { name: 'Work Orders', href: '/dashboard/manufacturing/work-orders' },
-] as const
-
-const ACCOUNTS_CHILDREN = [
-  { name: 'Overview', href: '/dashboard/finance' },
-  { name: 'Invoice Requests', href: '/dashboard/finance/invoice-requests' },
-  { name: 'Sales Invoices', href: '/dashboard/finance/sales-invoices' },
-  { name: 'Purchase Invoices', href: '/dashboard/finance/purchase-invoices' },
-  { name: 'Debit Notes', href: '/dashboard/finance/debit-notes' },
-  { name: 'Credit Notes', href: '/dashboard/finance/credit-notes' },
-  { name: 'Payment Entries', href: '/dashboard/finance/payment-entries' },
-  { name: 'Journal Entries', href: '/dashboard/finance/journal-entries' },
-  { name: 'Statement of Account', href: '/dashboard/finance/statement-of-account' },
-  { name: 'Settings', href: '/dashboard/finance/settings' },
-] as const
-
-const PURCHASE_CHILDREN = [
-  { name: 'Overview', href: '/dashboard/purchase' },
-  { name: 'Purchase Orders', href: '/dashboard/purchase/orders' },
-  { name: 'Purchase Receipts', href: '/dashboard/purchase/receipts' },
-  { name: 'Suppliers', href: '/dashboard/purchase/suppliers' },
-  { name: 'Settings', href: '/dashboard/purchase/settings' },
-] as const
-
-const SALES_CHILDREN = [
-  { name: 'Overview', href: '/dashboard/sales' },
-  { name: 'Sales Orders', href: '/dashboard/sales/orders' },
-  { name: 'Customers', href: '/dashboard/sales/customers' },
-] as const
-
-const HR_CHILDREN = [
-  { name: 'Overview', href: '/dashboard/hr' },
-  { name: 'Employees', href: '/dashboard/hr/employees' },
-] as const
-
-function inventoryChildActive(pathname: string, href: (typeof INVENTORY_CHILDREN)[number]['href']) {
-  if (href === '/dashboard/inventory') {
-    return pathname === '/dashboard/inventory'
-  }
-  if (href === '/dashboard/inventory/items') {
-    return pathname.startsWith('/dashboard/inventory/items')
-  }
-  if (href === '/dashboard/inventory/bom') {
-    return pathname.startsWith('/dashboard/inventory/bom')
-  }
-  if (href === '/dashboard/inventory/stock-entries') {
-    return pathname.startsWith('/dashboard/inventory/stock-entries')
-  }
-  if (href === '/dashboard/inventory/scrap') {
-    return pathname.startsWith('/dashboard/inventory/scrap')
-  }
-  if (href === '/dashboard/inventory/material-issue-requests') {
-    return pathname.startsWith('/dashboard/inventory/material-issue-requests')
-  }
-  if (href === '/dashboard/inventory/deposit-requests') {
-    return pathname.startsWith('/dashboard/inventory/deposit-requests')
-  }
-  return pathname === '/dashboard/inventory'
-}
-
-const navigationAfterInventory = [
-  { name: 'Dispatch', href: '/dashboard/dispatch', icon: Truck },
-  { name: 'Admin', href: '/dashboard/admin', icon: Settings },
-]
-
-function InventorySidebarSection({ sidebarOpen }: { sidebarOpen: boolean }) {
-  const pathname = usePathname()
-  const underInventory = pathname.startsWith('/dashboard/inventory')
-  const [expanded, setExpanded] = useState(underInventory)
-
-  useEffect(() => {
-    if (underInventory) setExpanded(true)
-  }, [underInventory])
-
-  if (!sidebarOpen) {
-    return (
-      <Link
-        href="/dashboard/inventory/items"
-        className={cn(
-          'text-app-nav-text-muted hover:text-app-nav-text flex items-center justify-center rounded-xl p-3 transition-colors hover:bg-slate-100 dark:hover:bg-white/10',
-          underInventory && 'bg-slate-100 text-app-nav-text dark:bg-white/10',
-        )}
-        title="Inventory — Items"
-      >
-        <Package size={20} />
-      </Link>
-    )
-  }
-
-  return (
-    <div className="mb-1">
-      <button
-        type="button"
-        onClick={() => setExpanded((e) => !e)}
-        className={cn(
-          'text-app-nav-text-muted hover:text-app-nav-text flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition-colors hover:bg-slate-100 dark:hover:bg-white/10',
-          underInventory && 'bg-slate-100 text-app-nav-text dark:bg-white/10',
-        )}
-        aria-expanded={expanded}
-      >
-        <Package size={20} className="shrink-0" />
-        <span className="flex-1 font-medium">Inventory</span>
-        {expanded ? (
-          <ChevronDown size={18} className="shrink-0 opacity-80" />
-        ) : (
-          <ChevronRight size={18} className="shrink-0 opacity-80" />
-        )}
-      </button>
-      {expanded && (
-        <div className="mt-1 space-y-1 border-l border-slate-200 ml-6 pl-2 mr-2 py-1 dark:border-white/15">
-          {INVENTORY_CHILDREN.map((child) => {
-            const active = inventoryChildActive(pathname, child.href)
-            return (
-              <Link
-                key={child.href}
-                href={child.href}
-                className={cn(
-                  'block rounded-lg px-3 py-2 text-sm transition-colors',
-                  active
-                    ? 'bg-slate-100 text-app-nav-text font-medium dark:bg-white/10'
-                    : 'text-app-nav-text-muted hover:text-app-nav-text hover:bg-slate-100 dark:hover:bg-white/10',
-                )}
-              >
-                {child.name}
-              </Link>
-            )
-          })}
-        </div>
-      )}
-    </div>
-  )
-}
-
-function manufacturingChildActive(
-  pathname: string,
-  href: (typeof MANUFACTURING_CHILDREN)[number]['href'],
-) {
-  if (href === '/dashboard/manufacturing/production') {
-    return pathname.startsWith('/dashboard/manufacturing/production')
-  }
-  if (href === '/dashboard/manufacturing') {
-    return pathname === '/dashboard/manufacturing'
-  }
-  if (href === '/dashboard/manufacturing/planning') {
-    return pathname.startsWith('/dashboard/manufacturing/planning')
-  }
-  return pathname.startsWith('/dashboard/manufacturing/work-orders')
-}
-
-function ManufacturingSidebarSection({ sidebarOpen }: { sidebarOpen: boolean }) {
-  const pathname = usePathname()
-  const underManufacturing = pathname.startsWith('/dashboard/manufacturing')
-  const [expanded, setExpanded] = useState(underManufacturing)
-
-  useEffect(() => {
-    if (underManufacturing) setExpanded(true)
-  }, [underManufacturing])
-
-  if (!sidebarOpen) {
-    return (
-      <Link
-        href="/dashboard/manufacturing"
-        className={cn(
-          'text-app-nav-text-muted hover:text-app-nav-text flex items-center justify-center rounded-xl p-3 transition-colors hover:bg-slate-100 dark:hover:bg-white/10',
-          underManufacturing && 'bg-slate-100 text-app-nav-text dark:bg-white/10',
-        )}
-        title="Manufacturing"
-      >
-        <Factory size={20} />
-      </Link>
-    )
-  }
-
-  return (
-    <div className="mb-1">
-      <button
-        type="button"
-        onClick={() => setExpanded((e) => !e)}
-        className={cn(
-          'text-app-nav-text-muted hover:text-app-nav-text flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition-colors hover:bg-slate-100 dark:hover:bg-white/10',
-          underManufacturing && 'bg-slate-100 text-app-nav-text dark:bg-white/10',
-        )}
-        aria-expanded={expanded}
-      >
-        <Factory size={20} className="shrink-0" />
-        <span className="flex-1 font-medium">Manufacturing</span>
-        {expanded ? (
-          <ChevronDown size={18} className="shrink-0 opacity-80" />
-        ) : (
-          <ChevronRight size={18} className="shrink-0 opacity-80" />
-        )}
-      </button>
-      {expanded && (
-        <div className="mt-1 space-y-1 border-l border-slate-200 ml-6 pl-2 mr-2 py-1 dark:border-white/15">
-          {MANUFACTURING_CHILDREN.map((child) => {
-            const active = manufacturingChildActive(pathname, child.href)
-            return (
-              <Link
-                key={child.href}
-                href={child.href}
-                className={cn(
-                  'block rounded-lg px-3 py-2 text-sm transition-colors',
-                  active
-                    ? 'bg-slate-100 text-app-nav-text font-medium dark:bg-white/10'
-                    : 'text-app-nav-text-muted hover:text-app-nav-text hover:bg-slate-100 dark:hover:bg-white/10',
-                )}
-              >
-                {child.name}
-              </Link>
-            )
-          })}
-        </div>
-      )}
-    </div>
-  )
-}
-
-function accountsChildActive(pathname: string, href: (typeof ACCOUNTS_CHILDREN)[number]['href']) {
-  if (href === '/dashboard/finance') return pathname === '/dashboard/finance'
-  if (href === '/dashboard/finance/invoice-requests') return pathname.startsWith('/dashboard/finance/invoice-requests')
-  if (href === '/dashboard/finance/sales-invoices') return pathname.startsWith('/dashboard/finance/sales-invoices')
-  if (href === '/dashboard/finance/purchase-invoices') return pathname.startsWith('/dashboard/finance/purchase-invoices')
-  if (href === '/dashboard/finance/debit-notes') return pathname.startsWith('/dashboard/finance/debit-notes')
-  if (href === '/dashboard/finance/credit-notes') return pathname.startsWith('/dashboard/finance/credit-notes')
-  if (href === '/dashboard/finance/payment-entries') return pathname.startsWith('/dashboard/finance/payment-entries')
-  if (href === '/dashboard/finance/journal-entries') return pathname.startsWith('/dashboard/finance/journal-entries')
-  if (href === '/dashboard/finance/statement-of-account') return pathname.startsWith('/dashboard/finance/statement-of-account')
-  return pathname.startsWith('/dashboard/finance/settings')
-}
-
-function AccountsSidebarSection({ sidebarOpen }: { sidebarOpen: boolean }) {
-  const pathname = usePathname()
-  const underAccounts = pathname.startsWith('/dashboard/finance')
-  const [expanded, setExpanded] = useState(underAccounts)
-
-  useEffect(() => {
-    if (underAccounts) setExpanded(true)
-  }, [underAccounts])
-
-  if (!sidebarOpen) {
-    return (
-      <Link
-        href="/dashboard/finance"
-        className={cn(
-          'text-app-nav-text-muted hover:text-app-nav-text flex items-center justify-center rounded-xl p-3 transition-colors hover:bg-slate-100 dark:hover:bg-white/10',
-          underAccounts && 'bg-slate-100 text-app-nav-text dark:bg-white/10',
-        )}
-        title="Accounts"
-      >
-        <DollarSign size={20} />
-      </Link>
-    )
-  }
-
-  return (
-    <div className="mb-1">
-      <button
-        type="button"
-        onClick={() => setExpanded((e) => !e)}
-        className={cn(
-          'text-app-nav-text-muted hover:text-app-nav-text flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition-colors hover:bg-slate-100 dark:hover:bg-white/10',
-          underAccounts && 'bg-slate-100 text-app-nav-text dark:bg-white/10',
-        )}
-        aria-expanded={expanded}
-      >
-        <DollarSign size={20} className="shrink-0" />
-        <span className="flex-1 font-medium">Accounts</span>
-        {expanded ? (
-          <ChevronDown size={18} className="shrink-0 opacity-80" />
-        ) : (
-          <ChevronRight size={18} className="shrink-0 opacity-80" />
-        )}
-      </button>
-      {expanded && (
-        <div className="mt-1 space-y-1 border-l border-slate-200 ml-6 pl-2 mr-2 py-1 dark:border-white/15">
-          {ACCOUNTS_CHILDREN.map((child) => {
-            const active = accountsChildActive(pathname, child.href)
-            return (
-              <Link
-                key={child.href}
-                href={child.href}
-                className={cn(
-                  'block rounded-lg px-3 py-2 text-sm transition-colors',
-                  active
-                    ? 'bg-slate-100 text-app-nav-text font-medium dark:bg-white/10'
-                    : 'text-app-nav-text-muted hover:text-app-nav-text hover:bg-slate-100 dark:hover:bg-white/10',
-                )}
-              >
-                {child.name}
-              </Link>
-            )
-          })}
-        </div>
-      )}
-    </div>
-  )
-}
-
-function purchaseChildActive(pathname: string, href: (typeof PURCHASE_CHILDREN)[number]['href']) {
-  if (href === '/dashboard/purchase') return pathname === '/dashboard/purchase'
-  if (href === '/dashboard/purchase/orders') return pathname.startsWith('/dashboard/purchase/orders')
-  if (href === '/dashboard/purchase/receipts') return pathname.startsWith('/dashboard/purchase/receipts')
-  if (href === '/dashboard/purchase/suppliers') return pathname.startsWith('/dashboard/purchase/suppliers')
-  if (href === '/dashboard/purchase/settings') return pathname.startsWith('/dashboard/purchase/settings')
-  return href === '/dashboard/purchase/orders' && pathname.startsWith('/dashboard/purchase/create')
-}
-
-function PurchaseSidebarSection({ sidebarOpen }: { sidebarOpen: boolean }) {
-  const pathname = usePathname()
-  const underPurchase = pathname.startsWith('/dashboard/purchase')
-  const [expanded, setExpanded] = useState(underPurchase)
-
-  useEffect(() => {
-    if (underPurchase) setExpanded(true)
-  }, [underPurchase])
-
-  if (!sidebarOpen) {
-    return (
-      <Link
-        href="/dashboard/purchase"
-        className={cn(
-          'text-app-nav-text-muted hover:text-app-nav-text flex items-center justify-center rounded-xl p-3 transition-colors hover:bg-slate-100 dark:hover:bg-white/10',
-          underPurchase && 'bg-slate-100 text-app-nav-text dark:bg-white/10',
-        )}
-        title="Purchase"
-      >
-        <Package2 size={20} />
-      </Link>
-    )
-  }
-
-  return (
-    <div className="mb-1">
-      <button
-        type="button"
-        onClick={() => setExpanded((e) => !e)}
-        className={cn(
-          'text-app-nav-text-muted hover:text-app-nav-text flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition-colors hover:bg-slate-100 dark:hover:bg-white/10',
-          underPurchase && 'bg-slate-100 text-app-nav-text dark:bg-white/10',
-        )}
-        aria-expanded={expanded}
-      >
-        <Package2 size={20} className="shrink-0" />
-        <span className="flex-1 font-medium">Purchase</span>
-        {expanded ? (
-          <ChevronDown size={18} className="shrink-0 opacity-80" />
-        ) : (
-          <ChevronRight size={18} className="shrink-0 opacity-80" />
-        )}
-      </button>
-      {expanded && (
-        <div className="mt-1 space-y-1 border-l border-slate-200 ml-6 pl-2 mr-2 py-1 dark:border-white/15">
-          {PURCHASE_CHILDREN.map((child) => {
-            const active = purchaseChildActive(pathname, child.href)
-            return (
-              <Link
-                key={child.href}
-                href={child.href}
-                className={cn(
-                  'block rounded-lg px-3 py-2 text-sm transition-colors',
-                  active
-                    ? 'bg-slate-100 text-app-nav-text font-medium dark:bg-white/10'
-                    : 'text-app-nav-text-muted hover:text-app-nav-text hover:bg-slate-100 dark:hover:bg-white/10',
-                )}
-              >
-                {child.name}
-              </Link>
-            )
-          })}
-        </div>
-      )}
-    </div>
-  )
-}
-
-function salesChildActive(pathname: string, href: (typeof SALES_CHILDREN)[number]['href']) {
-  if (href === '/dashboard/sales') return pathname === '/dashboard/sales'
-  if (href === '/dashboard/sales/customers') return pathname.startsWith('/dashboard/sales/customers')
-  if (href === '/dashboard/sales/orders') {
-    if (pathname.startsWith('/dashboard/sales/orders')) return true
-    if (pathname === '/dashboard/sales/create') return true
-    if (!pathname.startsWith('/dashboard/sales/')) return false
-    if (pathname.startsWith('/dashboard/sales/customers')) return false
-    if (pathname === '/dashboard/sales') return false
-    return true
-  }
-  return false
-}
-
-function SalesSidebarSection({ sidebarOpen }: { sidebarOpen: boolean }) {
-  const pathname = usePathname()
-  const underSales = pathname.startsWith('/dashboard/sales')
-  const [expanded, setExpanded] = useState(underSales)
-
-  useEffect(() => {
-    if (underSales) setExpanded(true)
-  }, [underSales])
-
-  if (!sidebarOpen) {
-    return (
-      <Link
-        href="/dashboard/sales"
-        className={cn(
-          'text-app-nav-text-muted hover:text-app-nav-text flex items-center justify-center rounded-xl p-3 transition-colors hover:bg-slate-100 dark:hover:bg-white/10',
-          underSales && 'bg-slate-100 text-app-nav-text dark:bg-white/10',
-        )}
-        title="Sales"
-      >
-        <ShoppingCart size={20} />
-      </Link>
-    )
-  }
-
-  return (
-    <div className="mb-1">
-      <button
-        type="button"
-        onClick={() => setExpanded((e) => !e)}
-        className={cn(
-          'text-app-nav-text-muted hover:text-app-nav-text flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition-colors hover:bg-slate-100 dark:hover:bg-white/10',
-          underSales && 'bg-slate-100 text-app-nav-text dark:bg-white/10',
-        )}
-        aria-expanded={expanded}
-      >
-        <ShoppingCart size={20} className="shrink-0" />
-        <span className="flex-1 font-medium">Sales</span>
-        {expanded ? (
-          <ChevronDown size={18} className="shrink-0 opacity-80" />
-        ) : (
-          <ChevronRight size={18} className="shrink-0 opacity-80" />
-        )}
-      </button>
-      {expanded && (
-        <div className="mt-1 space-y-1 border-l border-slate-200 ml-6 pl-2 mr-2 py-1 dark:border-white/15">
-          {SALES_CHILDREN.map((child) => {
-            const active = salesChildActive(pathname, child.href)
-            return (
-              <Link
-                key={child.href}
-                href={child.href}
-                className={cn(
-                  'block rounded-lg px-3 py-2 text-sm transition-colors',
-                  active
-                    ? 'bg-slate-100 text-app-nav-text font-medium dark:bg-white/10'
-                    : 'text-app-nav-text-muted hover:text-app-nav-text hover:bg-slate-100 dark:hover:bg-white/10',
-                )}
-              >
-                {child.name}
-              </Link>
-            )
-          })}
-        </div>
-      )}
-    </div>
-  )
-}
-
-function hrChildActive(pathname: string, href: (typeof HR_CHILDREN)[number]['href']) {
-  if (href === '/dashboard/hr') return pathname === '/dashboard/hr'
-  if (href === '/dashboard/hr/employees') {
-    if (pathname.startsWith('/dashboard/hr/employees')) return true
-    if (pathname === '/dashboard/hr/new') return true
-    if (pathname.startsWith('/dashboard/hr/edit-logs')) return true
-    if (pathname.startsWith('/dashboard/hr/import-export')) return true
-    const rest = pathname.slice('/dashboard/hr/'.length)
-    if (rest && !rest.includes('/') && rest !== 'employees') return true
-    return false
-  }
-  return false
-}
-
-function HRSidebarSection({ sidebarOpen }: { sidebarOpen: boolean }) {
-  const pathname = usePathname()
-  const underHr = pathname.startsWith('/dashboard/hr')
-  const [expanded, setExpanded] = useState(underHr)
-
-  useEffect(() => {
-    if (underHr) setExpanded(true)
-  }, [underHr])
-
-  if (!sidebarOpen) {
-    return (
-      <Link
-        href="/dashboard/hr"
-        className={cn(
-          'text-app-nav-text-muted hover:text-app-nav-text flex items-center justify-center rounded-xl p-3 transition-colors hover:bg-slate-100 dark:hover:bg-white/10',
-          underHr && 'bg-slate-100 text-app-nav-text dark:bg-white/10',
-        )}
-        title="HR"
-      >
-        <Users size={20} />
-      </Link>
-    )
-  }
-
-  return (
-    <div className="mb-1">
-      <button
-        type="button"
-        onClick={() => setExpanded((e) => !e)}
-        className={cn(
-          'text-app-nav-text-muted hover:text-app-nav-text flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition-colors hover:bg-slate-100 dark:hover:bg-white/10',
-          underHr && 'bg-slate-100 text-app-nav-text dark:bg-white/10',
-        )}
-        aria-expanded={expanded}
-      >
-        <Users size={20} className="shrink-0" />
-        <span className="flex-1 font-medium">HR</span>
-        {expanded ? (
-          <ChevronDown size={18} className="shrink-0 opacity-80" />
-        ) : (
-          <ChevronRight size={18} className="shrink-0 opacity-80" />
-        )}
-      </button>
-      {expanded && (
-        <div className="mt-1 space-y-1 border-l border-slate-200 ml-6 pl-2 mr-2 py-1 dark:border-white/15">
-          {HR_CHILDREN.map((child) => {
-            const active = hrChildActive(pathname, child.href)
-            return (
-              <Link
-                key={child.href}
-                href={child.href}
-                className={cn(
-                  'block rounded-lg px-3 py-2 text-sm transition-colors',
-                  active
-                    ? 'bg-slate-100 text-app-nav-text font-medium dark:bg-white/10'
-                    : 'text-app-nav-text-muted hover:text-app-nav-text hover:bg-slate-100 dark:hover:bg-white/10',
-                )}
-              >
-                {child.name}
-              </Link>
-            )
-          })}
-        </div>
-      )}
-    </div>
-  )
-}
-
-const COLORFUL_ACCENTS_LS_KEY = 'erp-dashboard-colorful-accents'
 const ASSISTANT_LAYOUT_LS_KEY = 'erp-assistant-panel-layout'
-
-function DashboardHeader({
-  mounted,
-  resolvedTheme,
-  colorfulAccents,
-  toggleColorfulAccents,
-  setTheme,
-  assistantOpen,
-  onToggleAssistant,
-}: {
-  mounted: boolean
-  resolvedTheme: string | undefined
-  colorfulAccents: boolean
-  toggleColorfulAccents: () => void
-  setTheme: (theme: string) => void
-  assistantOpen: boolean
-  onToggleAssistant: () => void
-}) {
-  return (
-    <header className="flex h-16 shrink-0 items-center justify-between border-b border-border/60 px-6">
-      <div className="flex items-center gap-2">
-        <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">LEJER</p>
-      </div>
-      <div className="flex items-center gap-2">
-        <AssistantTrigger active={assistantOpen} onClick={onToggleAssistant} />
-        {mounted && resolvedTheme === 'dark' ? (
-          <Button
-            type="button"
-            variant={colorfulAccents ? 'secondary' : 'outline'}
-            className="rounded-xl border-border/70 bg-background/60"
-            onClick={toggleColorfulAccents}
-            aria-pressed={colorfulAccents}
-            aria-label={
-              colorfulAccents
-                ? 'Turn off purple and green background accents'
-                : 'Turn on purple and green background accents'
-            }
-          >
-            Colorful
-          </Button>
-        ) : null}
-        <Button
-          type="button"
-          variant="outline"
-          className="rounded-xl border-border/70 bg-background/60"
-          onClick={() => setTheme(resolvedTheme === 'dark' ? 'light' : 'dark')}
-          aria-label="Toggle theme"
-        >
-          {mounted && resolvedTheme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
-          <span>{mounted && resolvedTheme === 'dark' ? 'Light mode' : 'Dark mode'}</span>
-        </Button>
-      </div>
-    </header>
-  )
-}
 
 function readAssistantLayout(): number[] | undefined {
   if (typeof window === 'undefined') return undefined
@@ -670,13 +41,11 @@ export default function DashboardLayout({
 }: {
   children: React.ReactNode
 }) {
-  const [sidebarOpen, setSidebarOpen] = useState(true)
   const [assistantOpen, setAssistantOpen] = useState(false)
   const [assistantLayout, setAssistantLayout] = useState<number[] | undefined>(undefined)
   const [mounted, setMounted] = useState(false)
-  const [colorfulAccents, setColorfulAccents] = useState(true)
+  const [userLabel, setUserLabel] = useState('')
   const router = useRouter()
-  const pathname = usePathname()
   const supabase = createClient()
   const { resolvedTheme, setTheme } = useTheme()
 
@@ -686,11 +55,23 @@ export default function DashboardLayout({
 
   useEffect(() => {
     if (!mounted) return
-    const stored = localStorage.getItem(COLORFUL_ACCENTS_LS_KEY)
-    if (stored !== null) {
-      setColorfulAccents(stored === 'true')
-    }
     setAssistantLayout(readAssistantLayout())
+  }, [mounted])
+
+  useEffect(() => {
+    if (!mounted) return
+    void (async () => {
+      try {
+        const res = await erpFetch<{
+          user: { firstName?: string | null; lastName?: string | null; email: string }
+        }>('/api/me')
+        const u = res.user
+        const name = `${u.firstName ?? ''} ${u.lastName ?? ''}`.trim()
+        setUserLabel(name || u.email)
+      } catch {
+        setUserLabel('')
+      }
+    })()
   }, [mounted])
 
   const handleLogout = async () => {
@@ -698,109 +79,35 @@ export default function DashboardLayout({
     router.push('/auth/login')
   }
 
-  const toggleColorfulAccents = () => {
-    setColorfulAccents((prev) => {
-      const next = !prev
-      localStorage.setItem(COLORFUL_ACCENTS_LS_KEY, String(next))
-      return next
-    })
+  const topBarProps = {
+    mounted,
+    resolvedTheme,
+    setTheme,
+    userLabel,
+    onLogout: () => void handleLogout(),
   }
+
+  const mainCanvas = (
+    <div className="erp-main-canvas flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+      <AppTopBar
+        {...topBarProps}
+        assistantOpen={assistantOpen}
+        onToggleAssistant={() => setAssistantOpen((o) => !o)}
+      />
+      <div className="min-h-0 flex-1 overflow-auto">{children}</div>
+    </div>
+  )
 
   return (
     <div
       className={cn(
-        'dashboard-dark-bg h-screen overflow-hidden bg-background p-3',
-        mounted && resolvedTheme === 'dark' && colorfulAccents && 'dashboard-colorful-accents',
+        'dashboard-shell flex h-screen overflow-hidden',
+        mounted && resolvedTheme === 'dark' && 'dashboard-colorful-accents',
       )}
     >
-      <div className="flex h-full gap-3">
-      <aside
-        className={cn(
-          sidebarOpen ? 'w-64' : 'w-20',
-          'flex h-full shrink-0 flex-col rounded-2xl border border-slate-200 bg-white text-slate-900 shadow-[0_24px_80px_-32px_rgba(15,23,42,0.35)] backdrop-blur-xl transition-all duration-300 dark:border-white/10 dark:bg-[#0a0e16]/75 dark:text-white dark:shadow-[0_24px_80px_-32px_rgba(0,0,0,0.65)] dark:backdrop-blur-md',
-        )}
-      >
-        <div className="flex items-center justify-between gap-2 border-b border-slate-200 p-4 dark:border-white/10">
-          <div className="flex min-w-0 flex-1 items-center gap-3">
-            <Link
-              href="/dashboard"
-              className="relative shrink-0 rounded-lg outline-offset-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring"
-              aria-label="LEJER home"
-            >
-              <Image
-                src={LEJER_LOGO_MARK_SRC}
-                alt=""
-                width={sidebarOpen ? 44 : 36}
-                height={sidebarOpen ? 44 : 36}
-                className="object-contain"
-                priority
-              />
-            </Link>
-            {sidebarOpen && (
-              <div className="min-w-0">
-                <h1 className="truncate text-lg font-semibold tracking-tight">LEJER</h1>
-                <p className="text-app-nav-text-soft text-xs">Manufacturing ERP</p>
-              </div>
-            )}
-          </div>
-          <button
-            onClick={() => setSidebarOpen(!sidebarOpen)}
-            className="text-app-nav-text-soft hover:text-app-nav-text rounded-lg p-2 hover:bg-slate-100 dark:hover:bg-white/10"
-          >
-            {sidebarOpen ? <X size={20} /> : <Menu size={20} />}
-          </button>
-        </div>
+      <AppSidebar />
 
-        <nav className="flex-1 space-y-1 overflow-y-auto p-3">
-          <Link
-            href="/dashboard"
-            className={cn(
-              'text-app-nav-text-muted hover:text-app-nav-text flex items-center gap-3 rounded-xl px-3 py-2.5 transition-colors hover:bg-slate-100 dark:hover:bg-white/10',
-              pathname === '/dashboard' && 'bg-slate-100 text-app-nav-text dark:bg-white/10',
-            )}
-          >
-            <LayoutDashboard size={20} />
-            {sidebarOpen && <span>Dashboard</span>}
-          </Link>
-
-          <InventorySidebarSection sidebarOpen={sidebarOpen} />
-          <ManufacturingSidebarSection sidebarOpen={sidebarOpen} />
-          <AccountsSidebarSection sidebarOpen={sidebarOpen} />
-          <PurchaseSidebarSection sidebarOpen={sidebarOpen} />
-          <SalesSidebarSection sidebarOpen={sidebarOpen} />
-          <HRSidebarSection sidebarOpen={sidebarOpen} />
-
-          {navigationAfterInventory.map((item) => (
-            <Link
-              key={item.name}
-              href={item.href}
-              className={cn(
-                'text-app-nav-text-muted hover:text-app-nav-text flex items-center gap-3 rounded-xl px-3 py-2.5 transition-colors hover:bg-slate-100 dark:hover:bg-white/10',
-                pathname.startsWith(item.href) && 'bg-slate-100 text-app-nav-text dark:bg-white/10',
-              )}
-            >
-              <item.icon size={20} />
-              {sidebarOpen && <span>{item.name}</span>}
-            </Link>
-          ))}
-        </nav>
-
-        <div className="border-t border-slate-200 p-3 dark:border-white/10">
-          <Button
-            onClick={handleLogout}
-            variant="ghost"
-            className={cn(
-              'text-app-nav-text-muted hover:text-app-nav-text w-full justify-start rounded-xl hover:bg-slate-100 dark:hover:bg-white/10',
-              !sidebarOpen && 'justify-center px-0',
-            )}
-          >
-            <LogOut size={20} />
-            {sidebarOpen && <span className="ml-2">Logout</span>}
-          </Button>
-        </div>
-      </aside>
-
-      <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-2xl border border-border/50 bg-background/75 backdrop-blur-xl dark:border-white/10 dark:bg-transparent dark:shadow-none dark:backdrop-blur-none">
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col">
         {assistantOpen ? (
           <ResizablePanelGroup
             direction="horizontal"
@@ -819,18 +126,7 @@ export default function DashboardLayout({
               minSize={35}
               className="min-w-0"
             >
-              <main className="flex h-full min-h-0 flex-col overflow-hidden">
-                <DashboardHeader
-                  mounted={mounted}
-                  resolvedTheme={resolvedTheme}
-                  colorfulAccents={colorfulAccents}
-                  toggleColorfulAccents={toggleColorfulAccents}
-                  setTheme={setTheme}
-                  assistantOpen={assistantOpen}
-                  onToggleAssistant={() => setAssistantOpen((o) => !o)}
-                />
-                <div className="min-h-0 flex-1 overflow-auto">{children}</div>
-              </main>
+              {mainCanvas}
             </ResizablePanel>
             <ResizableHandle withHandle className="bg-border/80" />
             <ResizablePanel
@@ -845,20 +141,8 @@ export default function DashboardLayout({
             </ResizablePanel>
           </ResizablePanelGroup>
         ) : (
-          <main className="flex h-full min-h-0 flex-col overflow-hidden">
-            <DashboardHeader
-              mounted={mounted}
-              resolvedTheme={resolvedTheme}
-              colorfulAccents={colorfulAccents}
-              toggleColorfulAccents={toggleColorfulAccents}
-              setTheme={setTheme}
-              assistantOpen={assistantOpen}
-              onToggleAssistant={() => setAssistantOpen(true)}
-            />
-            <div className="min-h-0 flex-1 overflow-auto">{children}</div>
-          </main>
+          mainCanvas
         )}
-      </div>
       </div>
     </div>
   )

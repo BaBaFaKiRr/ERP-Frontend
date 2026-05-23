@@ -3,12 +3,9 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { erpFetch } from '@/lib/erp-api'
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card'
+import { DashboardWidget } from '@/components/dashboard/dashboard-widget'
+import { cn } from '@/lib/utils'
+import { Button } from '@/components/ui/button'
 
 type PendingPurchaseReceipt = {
   id: string
@@ -53,7 +50,6 @@ type SalesOrderPendingApproval = {
 
 type PendingApprovalItem = {
   id: string
-  kind: 'purchase_receipt' | 'sales_invoice' | 'sales_order'
   kindLabel: string
   reference: string
   subtitle: string
@@ -67,6 +63,30 @@ type MeUser = {
   lastName?: string | null
   email: string
 }
+
+type DashboardSummary = {
+  sales_orders_pending_approval: number
+  work_orders_open: number
+  sales_orders_approved_awaiting_wo: number
+  overdue_payables_count: number
+  overdue_receivables_count: number
+}
+
+const PERIOD_OPTIONS = [
+  { value: 'week', label: 'This Week' },
+  { value: 'month', label: 'This Month' },
+  { value: 'fiscal', label: 'This Fiscal Year' },
+]
+
+const TABS = [
+  { id: 'overview', label: 'Overview' },
+  { id: 'receivables', label: 'Receivables' },
+  { id: 'payables', label: 'Procurement & Payables' },
+  { id: 'operations', label: 'Manufacturing' },
+  { id: 'approvals', label: 'Approvals' },
+] as const
+
+type TabId = (typeof TABS)[number]['id']
 
 function formatCurrency(value: number): string {
   return `₹${value.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
@@ -83,7 +103,6 @@ function buildPendingApprovals(
   for (const receipt of pendingReceipts) {
     items.push({
       id: `pr-${receipt.id}`,
-      kind: 'purchase_receipt',
       kindLabel: 'Purchase Receipt',
       reference: receipt.pr_number,
       subtitle: [
@@ -101,7 +120,6 @@ function buildPendingApprovals(
     const invoice = invoiceByDispatchId.get(row.id)
     items.push({
       id: `si-${row.id}`,
-      kind: 'sales_invoice',
       kindLabel: 'Sales Invoice',
       reference: invoice?.invoice_number ?? row.do_number ?? '—',
       subtitle: [
@@ -120,7 +138,6 @@ function buildPendingApprovals(
   for (const order of pendingSalesOrders) {
     items.push({
       id: `so-${order.id}`,
-      kind: 'sales_order',
       kindLabel: 'Sales Order',
       reference: order.order_number,
       subtitle: [
@@ -138,38 +155,62 @@ function buildPendingApprovals(
   )
 }
 
+function MetricRow({ label, value, href }: { label: string; value: string | number; href?: string }) {
+  const inner = (
+    <div className="flex items-center justify-between gap-2 py-2">
+      <span className="text-sm text-[#64748b] dark:text-slate-400">{label}</span>
+      <span className="text-lg font-semibold tabular-nums text-[#0f172a] dark:text-white">
+        {value}
+      </span>
+    </div>
+  )
+  if (href) {
+    return (
+      <Link href={href} className="block rounded-md hover:bg-[#f1f5f9] dark:hover:bg-white/5">
+        {inner}
+      </Link>
+    )
+  }
+  return inner
+}
+
 export default function DashboardPage() {
+  const [activeTab, setActiveTab] = useState<TabId>('overview')
+  const [period, setPeriod] = useState('fiscal')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [me, setMe] = useState<MeUser | null>(null)
+  const [summary, setSummary] = useState<DashboardSummary | null>(null)
+  const [adminTotals, setAdminTotals] = useState({ totalSales: 0, totalPurchases: 0 })
+  const [pendingApprovals, setPendingApprovals] = useState<PendingApprovalItem[]>([])
   const [metrics, setMetrics] = useState({
     totalSalesOrders: 0,
     pendingSalesApprovals: 0,
     activeWorkOrders: 0,
     purchasePendingApprovals: 0,
   })
-  const [adminTotals, setAdminTotals] = useState({ totalSales: 0, totalPurchases: 0 })
-  const [me, setMe] = useState<MeUser | null>(null)
-  const [pendingApprovals, setPendingApprovals] = useState<PendingApprovalItem[]>([])
 
   const isAdmin = me?.role === 'admin'
+  const displayName = `${me?.firstName ?? ''} ${me?.lastName ?? ''}`.trim()
 
   useEffect(() => {
-    const loadMe = async () => {
+    void (async () => {
       try {
         const meRes = await erpFetch<{ user: MeUser }>('/api/me')
         setMe(meRes.user ?? null)
       } catch {
         setMe(null)
       }
-    }
-
-    void loadMe()
+    })()
   }, [])
 
   const loadDashboard = async () => {
     setLoading(true)
     setError(null)
     try {
+      const summaryRes = await erpFetch<{ data: DashboardSummary }>('/api/analytics/dashboard-summary')
+      setSummary(summaryRes.data ?? null)
+
       if (me?.role === 'admin') {
         const [salesInvoicesRes, purchaseInvoicesRes, purchaseReceiptRes, dispatchRes, salesOrdersRes] =
           await Promise.all([
@@ -258,118 +299,255 @@ export default function DashboardPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [me?.role])
 
-  const displayName = `${me?.firstName ?? ''} ${me?.lastName ?? ''}`.trim()
+  const showApprovals = activeTab === 'approvals' || (activeTab === 'overview' && isAdmin)
 
   return (
-    <div className="p-6 md:p-8">
-      <div className="mb-8">
-        <h1 className="text-3xl font-semibold tracking-tight">
-          {displayName ? `Hello, ${displayName}` : 'Hello'}
+    <div className="min-h-full p-4 md:p-6 lg:p-8">
+      <div className="mb-6">
+        <h1 className="text-2xl font-semibold tracking-tight text-[#1e293b] dark:text-white">
+          Business Overview
         </h1>
+        {displayName ? (
+          <p className="mt-1 text-sm text-[#64748b] dark:text-slate-400">
+            Welcome back, {displayName}
+          </p>
+        ) : null}
       </div>
 
-      {error && <p className="mb-4 text-sm text-red-600">{error}</p>}
+      <div className="mb-6 flex flex-wrap gap-6 border-b border-[#e2e8f0] dark:border-white/10">
+        {TABS.map((tab) => (
+          <button
+            key={tab.id}
+            type="button"
+            onClick={() => setActiveTab(tab.id)}
+            className={cn(
+              '-mb-px border-b-2 pb-2.5 text-sm font-medium transition-colors',
+              activeTab === tab.id
+                ? 'border-[#2563eb] text-[#2563eb]'
+                : 'border-transparent text-[#64748b] hover:text-[#334155] dark:text-slate-400 dark:hover:text-slate-200',
+            )}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
 
-      {isAdmin ? (
-        <>
-          <div className="mb-8 grid grid-cols-1 gap-4 md:grid-cols-2">
-            <Card className="border-border/70 bg-card/70 backdrop-blur-sm dark:border-white/10 dark:bg-white/[0.04] dark:backdrop-blur-md">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground">Total Sales</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-3xl font-semibold text-emerald-500 dark:text-emerald-400">
-                  {loading ? '…' : formatCurrency(adminTotals.totalSales)}
-                </div>
-              </CardContent>
-            </Card>
-            <Card className="border-border/70 bg-card/70 backdrop-blur-sm dark:border-white/10 dark:bg-white/[0.04] dark:backdrop-blur-md">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground">Total Purchases</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-3xl font-semibold text-red-400 dark:text-red-400">
-                  {loading ? '…' : formatCurrency(adminTotals.totalPurchases)}
-                </div>
-              </CardContent>
-            </Card>
+      <div className="mb-6 overflow-hidden rounded-lg border border-[#dbeafe] bg-gradient-to-r from-[#eff6ff] via-white to-[#f0f9ff] p-4 dark:border-[#3b82f6]/25 dark:from-[#1e3a5f]/40 dark:via-[#1a1f2e] dark:to-[#0f172a] md:p-6">
+        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+          <div>
+            <p className="text-xs font-medium uppercase tracking-wider text-[#3b82f6]">
+              LEJER ERP
+            </p>
+            <h2 className="mt-1 text-lg font-semibold text-[#0f172a] dark:text-white">
+              Manufacturing operations at a glance
+            </h2>
+            <p className="mt-1 max-w-xl text-sm text-[#64748b] dark:text-slate-400">
+              Track sales, purchases, production, and approvals from one place. Use the left menu to
+              open each module.
+            </p>
           </div>
+          <Button asChild className="shrink-0 rounded-md bg-[#2563eb] hover:bg-[#1d4ed8]">
+            <Link href="/dashboard/sales/orders">View sales orders</Link>
+          </Button>
+        </div>
+      </div>
 
-          <Card className="border-border/70 bg-card/70 backdrop-blur-sm dark:border-white/10 dark:bg-white/[0.04] dark:backdrop-blur-md">
-            <CardHeader>
-              <CardTitle className="text-lg">Pending Approvals</CardTitle>
-            </CardHeader>
-            <CardContent>
-              {loading ? (
-                <p className="text-sm text-muted-foreground">Loading…</p>
-              ) : pendingApprovals.length === 0 ? (
-                <p className="text-sm text-muted-foreground">Nothing pending your approval.</p>
-              ) : (
-                <div className="space-y-2">
-                  {pendingApprovals.map((item) => (
-                    <Link
-                      key={item.id}
-                      href={item.href}
-                      className="block rounded-md border p-3 hover:bg-muted/40"
-                    >
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="min-w-0">
-                          <p className="font-mono text-sm">{item.reference}</p>
-                          <p className="text-xs text-muted-foreground">{item.subtitle}</p>
-                        </div>
-                        <span className="shrink-0 rounded-full bg-amber-500/15 px-2 py-0.5 text-xs font-medium text-amber-700 dark:text-amber-400">
-                          {item.kindLabel}
-                        </span>
-                      </div>
-                    </Link>
-                  ))}
+      {error ? <p className="mb-4 text-sm text-red-600 dark:text-red-400">{error}</p> : null}
+
+      {(activeTab === 'overview' || activeTab === 'receivables') && (
+        <div className="mb-6 grid grid-cols-1 gap-4 lg:grid-cols-3">
+          <DashboardWidget
+            title="Receivable Summary"
+            period={period}
+            periodOptions={PERIOD_OPTIONS}
+            onPeriodChange={setPeriod}
+            className="lg:col-span-1"
+            isEmpty={!summary && !loading}
+          >
+            <div className="divide-y divide-[#e8edf3] dark:divide-white/10">
+              <MetricRow
+                label="Overdue receivables"
+                value={loading ? '…' : (summary?.overdue_receivables_count ?? 0)}
+                href="/dashboard/finance/statement-of-account"
+              />
+              <MetricRow
+                label="Sales pending approval"
+                value={
+                  loading
+                    ? '…'
+                    : isAdmin
+                      ? pendingApprovals.filter((p) => p.kindLabel === 'Sales Order').length
+                      : metrics.pendingSalesApprovals
+                }
+                href="/dashboard/sales/orders"
+              />
+              {isAdmin ? (
+                <MetricRow
+                  label="Total sales (invoiced)"
+                  value={loading ? '…' : formatCurrency(adminTotals.totalSales)}
+                  href="/dashboard/finance/sales-invoices"
+                />
+              ) : null}
+            </div>
+          </DashboardWidget>
+
+          <DashboardWidget
+            title="Payable Summary"
+            period={period}
+            periodOptions={PERIOD_OPTIONS}
+            onPeriodChange={setPeriod}
+            className="lg:col-span-1"
+            isEmpty={!summary && !loading}
+          >
+            <div className="divide-y divide-[#e8edf3] dark:divide-white/10">
+              <MetricRow
+                label="Payments due"
+                value={loading ? '…' : (summary?.overdue_payables_count ?? 0)}
+                href="/dashboard/finance/purchase-invoices"
+              />
+              <MetricRow
+                label="Purchase receipts pending"
+                value={loading ? '…' : metrics.purchasePendingApprovals}
+                href="/dashboard/purchase/receipts"
+              />
+              {isAdmin ? (
+                <MetricRow
+                  label="Total purchases"
+                  value={loading ? '…' : formatCurrency(adminTotals.totalPurchases)}
+                  href="/dashboard/finance/purchase-invoices"
+                />
+              ) : null}
+            </div>
+          </DashboardWidget>
+
+          <DashboardWidget
+            title="Performance Indicators"
+            period={period}
+            periodOptions={PERIOD_OPTIONS}
+            onPeriodChange={setPeriod}
+            className="lg:col-span-1"
+          >
+            <div className="divide-y divide-[#e8edf3] dark:divide-white/10">
+              <MetricRow
+                label="Open work orders"
+                value={loading ? '…' : (summary?.work_orders_open ?? metrics.activeWorkOrders)}
+                href="/dashboard/manufacturing/work-orders"
+              />
+              <MetricRow
+                label="SOs awaiting work order"
+                value={loading ? '…' : (summary?.sales_orders_approved_awaiting_wo ?? 0)}
+                href="/dashboard/manufacturing"
+              />
+              <MetricRow
+                label="Total sales orders"
+                value={loading ? '…' : metrics.totalSalesOrders}
+                href="/dashboard/sales/orders"
+              />
+            </div>
+          </DashboardWidget>
+        </div>
+      )}
+
+      {(activeTab === 'overview' || activeTab === 'operations') && (
+        <div className="mb-6 grid grid-cols-1 gap-4 lg:grid-cols-2">
+          <DashboardWidget
+            title="Production Pipeline"
+            period={period}
+            periodOptions={PERIOD_OPTIONS}
+            onPeriodChange={setPeriod}
+          >
+            {loading ? (
+              <p className="text-sm text-[#64748b] dark:text-slate-400">Loading…</p>
+            ) : (
+              <div className="space-y-3">
+                <MetricRow
+                  label="Active work orders"
+                  value={summary?.work_orders_open ?? metrics.activeWorkOrders}
+                  href="/dashboard/manufacturing/work-orders"
+                />
+                <MetricRow
+                  label="Approved SOs — no WO yet"
+                  value={summary?.sales_orders_approved_awaiting_wo ?? 0}
+                  href="/dashboard/manufacturing"
+                />
+              </div>
+            )}
+          </DashboardWidget>
+
+          <DashboardWidget
+            title="Cash Position"
+            period={period}
+            periodOptions={PERIOD_OPTIONS}
+            onPeriodChange={setPeriod}
+            isEmpty={!isAdmin && !loading}
+            emptyMessage="Cash position summary is available to admin and finance roles."
+          >
+            {isAdmin && !loading ? (
+              <div className="grid grid-cols-2 gap-4">
+                <div className="rounded-md bg-[#ecfdf5] p-4 dark:bg-emerald-950/30">
+                  <p className="text-xs font-medium text-[#059669] dark:text-emerald-400">Sales</p>
+                  <p className="mt-1 text-xl font-semibold text-[#047857] dark:text-emerald-300">
+                    {formatCurrency(adminTotals.totalSales)}
+                  </p>
                 </div>
-              )}
-            </CardContent>
-          </Card>
-        </>
-      ) : (
-        <div className="mb-8 grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
-          <Card className="border-border/70 bg-card/70 backdrop-blur-sm dark:border-white/10 dark:bg-white/[0.04] dark:backdrop-blur-md">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">Sales Orders</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-semibold">{loading ? '…' : metrics.totalSalesOrders}</div>
-            </CardContent>
-          </Card>
-          <Card className="border-border/70 bg-card/70 backdrop-blur-sm dark:border-white/10 dark:bg-white/[0.04] dark:backdrop-blur-md">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                Sales Pending Approval
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-semibold">
-                {loading ? '…' : metrics.pendingSalesApprovals}
+                <div className="rounded-md bg-[#fef2f2] p-4 dark:bg-red-950/30">
+                  <p className="text-xs font-medium text-[#dc2626] dark:text-red-400">Purchases</p>
+                  <p className="mt-1 text-xl font-semibold text-[#b91c1c] dark:text-red-300">
+                    {formatCurrency(adminTotals.totalPurchases)}
+                  </p>
+                </div>
               </div>
-            </CardContent>
-          </Card>
-          <Card className="border-border/70 bg-card/70 backdrop-blur-sm dark:border-white/10 dark:bg-white/[0.04] dark:backdrop-blur-md">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">Active Work Orders</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-semibold">{loading ? '…' : metrics.activeWorkOrders}</div>
-            </CardContent>
-          </Card>
-          <Card className="border-border/70 bg-card/70 backdrop-blur-sm dark:border-white/10 dark:bg-white/[0.04] dark:backdrop-blur-md">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                Purchase Receipt Pending Approval
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-semibold">
-                {loading ? '…' : metrics.purchasePendingApprovals}
-              </div>
-            </CardContent>
-          </Card>
+            ) : null}
+          </DashboardWidget>
+        </div>
+      )}
+
+      {showApprovals && (
+        <DashboardWidget
+          title="Pending Approvals"
+          className="mb-6"
+          isEmpty={!loading && pendingApprovals.length === 0}
+          emptyMessage="Nothing pending your approval right now."
+        >
+          {!loading && pendingApprovals.length > 0 ? (
+            <div className="space-y-2">
+              {pendingApprovals.map((item) => (
+                <Link
+                  key={item.id}
+                  href={item.href}
+                  className="flex items-start justify-between gap-3 rounded-md border border-[#e8edf3] p-3 transition-colors hover:bg-[#f8fafc] dark:border-white/10 dark:hover:bg-white/5"
+                >
+                  <div className="min-w-0">
+                    <p className="font-mono text-sm font-medium text-[#0f172a] dark:text-white">
+                      {item.reference}
+                    </p>
+                    <p className="text-xs text-[#64748b] dark:text-slate-400">{item.subtitle}</p>
+                  </div>
+                  <span className="shrink-0 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800 dark:bg-amber-500/20 dark:text-amber-300">
+                    {item.kindLabel}
+                  </span>
+                </Link>
+              ))}
+            </div>
+          ) : null}
+        </DashboardWidget>
+      )}
+
+      {activeTab === 'payables' && !showApprovals && (
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+          <DashboardWidget title="Procurement overview" period={period} periodOptions={PERIOD_OPTIONS} onPeriodChange={setPeriod}>
+            <MetricRow
+              label="Receipts pending approval"
+              value={loading ? '…' : metrics.purchasePendingApprovals}
+              href="/dashboard/purchase/receipts"
+            />
+            <MetricRow
+              label="Payments due"
+              value={loading ? '…' : (summary?.overdue_payables_count ?? 0)}
+              href="/dashboard/finance/purchase-invoices"
+            />
+          </DashboardWidget>
+          <DashboardWidget title="Purchase orders" isEmpty emptyMessage="Open Purchase from the left menu to create and track POs." />
         </div>
       )}
     </div>

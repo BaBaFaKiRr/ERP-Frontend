@@ -4,6 +4,9 @@
 @custom-variant dark (&:is(.dark *));
 
 :root {
+  --erp-canvas: #f4f7fa;
+  --erp-sidebar: #1c2130;
+  --erp-topbar: #1c2130;
   --background: oklch(1 0 0);
   --foreground: oklch(0.145 0 0);
   --card: oklch(1 0 0);
@@ -155,13 +158,31 @@
 }
 
 @layer utilities {
-  /* Light: full ambient stack (violet, cyan, fuchsia, green) — not toggled by Colorful */
-  html.light .dashboard-dark-bg {
+  /* Zoho-style shell: dark sidebar + topbar, light canvas in light mode */
+  html.light .dashboard-shell {
+    background: var(--erp-sidebar);
+  }
+
+  html.light .erp-main-canvas {
+    background: var(--erp-canvas);
+  }
+
+  html.dark .dashboard-shell {
+    background: #000000;
+  }
+
+  html.dark .erp-main-canvas {
+    background: transparent;
+  }
+
+  html.dark .dashboard-shell.dashboard-colorful-accents {
+    background-color: #000000;
     background-image:
-      radial-gradient(circle at top left, rgba(124, 58, 237, 0.2), transparent 40%),
-      radial-gradient(circle at top right, rgba(14, 165, 233, 0.12), transparent 35%),
-      radial-gradient(circle at 92% 6%, rgba(192, 38, 211, 0.12), transparent 35%),
-      radial-gradient(circle at bottom right, rgba(34, 197, 94, 0.12), transparent 35%);
+      radial-gradient(ellipse 90% 70% at 0% 50%, rgba(59, 130, 246, 0.35) 0%, transparent 55%),
+      radial-gradient(ellipse 75% 60% at 100% 10%, rgba(192, 38, 211, 0.35) 0%, transparent 55%),
+      radial-gradient(ellipse 75% 60% at 100% 90%, rgba(34, 197, 94, 0.35) 0%, transparent 55%),
+      linear-gradient(180deg, #000000 0%, #050505 28%, #0d1b2a 50%, #0a1525 72%, #000000 100%);
+    background-attachment: fixed;
   }
 
   html.dark .dashboard-dark-bg {

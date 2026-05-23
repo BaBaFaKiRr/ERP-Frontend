@@ -1,0 +1,8 @@
+I want to implement a Payment Reminders flow
+
+On the Accounts-> Overview page, I want to setup alerts for Payments Due and Recievables Due in widgets
+In payments due:
+List all the Purchase Invoices past due payment
+
+In Recievables due:
+List all the Sales Invoices past due payment
