@@ -1,0 +1,24 @@
+I want to implement a Journal Entry object and flow:
+
+Under Accounts tab, add a Journal entry page. On this page, we show all Journal Entries with net Incoming Funds and Outgoing funds for the current financial year on top.
+We also have "Create Journal Entry" button on top right. Clicking on this button takes us to Create Journal Entry page.
+Here we ask user for:
+Toggle: Payment received or Payment made
+Entity: Choose from: supplier, customer, employee, other
+if supplier, customer or employee is chosen, show search bar to choose one.
+if other is chosen, ask for Name*, Company, Designation, Phone Number*, Note
+Date of Transaction: default to today but mutable
+Total Amount of Transaction:
+Description:
+payment receipt: Upload from user's device (store in supabase and display on Journal entry details page)
+sales invoice: Upload from user's device (store in supabase and display on Journal entry details page)
+Link to: Purchase, Sale, Maintainance, HR, Business Event, Miscellaneous
+If Purchase chosen: Give option to link a PO, PR or PI
+If Sale is chosen: Give option to link a Sales Invoice or Proforma Invoice
+Created by: Logged in user's name (immutable)
+Created at: Current date and time immutable
+
+                                                    Create button
+
+Creating a Journal entry adds a new entry into db. Also if a Journal entry of a payment made/received is created for a 
+supplier/customer, we accomodate it into statement of account.

@@ -20,7 +20,7 @@ import {
 } from '@/components/ui/table'
 
 type DataAction = 'import' | 'export'
-type DataSegment = 'suppliers' | 'customers'
+type DataSegment = 'suppliers' | 'customers' | 'items'
 
 type SupplierConstraints = {
   supplier_type: 'all' | 'domestic' | 'international'
@@ -104,10 +104,17 @@ function formatWhen(iso: string) {
 function ImportExportPageContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const initialSegment =
-    searchParams.get('segment') === 'customers' ? 'customers' : 'suppliers'
+  const segmentParam = searchParams.get('segment')
+  const initialSegment: DataSegment =
+    segmentParam === 'customers'
+      ? 'customers'
+      : segmentParam === 'items'
+        ? 'items'
+        : 'suppliers'
 
-  const [action, setAction] = useState<DataAction>('export')
+  const [action, setAction] = useState<DataAction>(
+    searchParams.get('action') === 'import' ? 'import' : 'export',
+  )
   const [segment, setSegment] = useState<DataSegment>(initialSegment)
   const [useConstraints, setUseConstraints] = useState(false)
   const [supplierConstraints, setSupplierConstraints] = useState<SupplierConstraints>(
@@ -274,7 +281,11 @@ function ImportExportPageContent() {
   }
 
   const backHref =
-    segment === 'suppliers' ? '/dashboard/purchase/suppliers' : '/dashboard/sales/create'
+    segment === 'items'
+      ? '/dashboard/inventory/items'
+      : segment === 'suppliers'
+        ? '/dashboard/purchase/suppliers'
+        : '/dashboard/sales/create'
 
   return (
     <div className="p-8 max-w-4xl space-y-6">
@@ -288,7 +299,7 @@ function ImportExportPageContent() {
         <div>
           <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Import / Export Data</h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Download or upload supplier and customer master data as CSV.
+            Download or upload supplier, customer, and item master data as CSV or Excel.
           </p>
         </div>
       </div>
@@ -346,6 +357,7 @@ function ImportExportPageContent() {
               >
                 <option value="suppliers">Suppliers</option>
                 <option value="customers">Customers</option>
+                <option value="items">Items</option>
               </select>
             </div>
           </div>
@@ -378,7 +390,7 @@ function ImportExportPageContent() {
             </>
           )}
 
-          {action === 'export' && (
+          {action === 'export' && segment !== 'items' && (
             <label className="flex items-center gap-2 text-sm cursor-pointer">
               <Checkbox checked={useConstraints} onCheckedChange={(v) => handleConstraintsToggle(Boolean(v))} />
               Add constraints

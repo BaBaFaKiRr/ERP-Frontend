@@ -14,6 +14,7 @@ import { Input } from '@/components/ui/input'
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuRadioGroup,
   DropdownMenuRadioItem,
@@ -28,8 +29,8 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
-import { ArrowUpDown, Filter, PackagePlus, Search } from 'lucide-react'
-import { erpFetch } from '@/lib/erp-api'
+import { ArrowUpDown, Download, EllipsisVertical, Filter, PackagePlus, Search, Upload } from 'lucide-react'
+import { erpFetch, erpFetchBlob, downloadBlob } from '@/lib/erp-api'
 
 type ItemRow = {
   id: string
@@ -115,6 +116,7 @@ export default function ItemsListPage() {
   const [activeFilter, setActiveFilter] = useState<ItemActiveFilter>('all')
   const [trackFilter, setTrackFilter] = useState<ItemTrackFilter>('all')
   const [sortBy, setSortBy] = useState<ItemSortOption>('sku_asc')
+  const [exportBusy, setExportBusy] = useState(false)
 
   const load = async () => {
     setLoading(true)
@@ -189,6 +191,22 @@ export default function ItemsListPage() {
   const filterBits =
     (typeFilter !== 'all' ? 1 : 0) + (activeFilter !== 'all' ? 1 : 0) + (trackFilter !== 'all' ? 1 : 0)
 
+  const runExport = async () => {
+    setExportBusy(true)
+    setError(null)
+    try {
+      const { blob, filename } = await erpFetchBlob('/api/data-import-export/export', {
+        method: 'POST',
+        body: { segment: 'items', constraints: {} },
+      })
+      downloadBlob(blob, filename ?? 'items-export.csv')
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Export failed')
+    } finally {
+      setExportBusy(false)
+    }
+  }
+
   const sortLabel: Record<ItemSortOption, string> = {
     sku_asc: 'SKU (A–Z)',
     sku_desc: 'SKU (Z–A)',
@@ -211,12 +229,39 @@ export default function ItemsListPage() {
             Master catalog — SKUs used on sales orders, purchasing, and manufacturing.
           </p>
         </div>
-        <Button className="flex items-center gap-2 shrink-0" asChild>
-          <Link href="/dashboard/inventory/items/new">
-            <PackagePlus size={18} />
-            Create Item
-          </Link>
-        </Button>
+        <div className="flex items-center gap-2 shrink-0">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button type="button" variant="outline" size="icon" aria-label="More item actions">
+                <EllipsisVertical className="size-5" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem
+                disabled={exportBusy}
+                onSelect={(e) => {
+                  e.preventDefault()
+                  void runExport()
+                }}
+              >
+                <Download className="mr-2 size-4" />
+                {exportBusy ? 'Exporting…' : 'Export items'}
+              </DropdownMenuItem>
+              <DropdownMenuItem asChild>
+                <Link href="/dashboard/import-export?segment=items&action=import">
+                  <Upload className="mr-2 size-4" />
+                  Import items
+                </Link>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+          <Button className="flex items-center gap-2" asChild>
+            <Link href="/dashboard/inventory/items/new">
+              <PackagePlus size={18} />
+              Create Item
+            </Link>
+          </Button>
+        </div>
       </div>
 
       {error && (

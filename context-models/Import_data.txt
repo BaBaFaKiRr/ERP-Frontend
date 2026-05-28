@@ -1,0 +1,25 @@
+This is how we import/export data
+
+Supplier:
+We can import or export suppliers by a csv file upload.
+So on this page add a 3 verticle dot icon before "Add Supplier" button
+Clicking on this icon extends a drop-down menu with option: "Import/Export Data"
+If we press on this, we are taken to Import/Export Data page. Here we have field:
+Action*: Choose from drop-down menu (menu items: Import and Export) 
+Data Segment*: Choose from drop-down menu (menu items: Suppliers, Customers)
+<if import chosen, show button: "Download sample" and show option to upload a csv file from device (typecheck csv or xlsx)>
+<checkbox> add constraints
+<if checked (implement undo operation on uncheck as well)> show filter options as per chosen segment
+<button><Export/Import whatever action chosen></button>
+Table of Export/Import operations performed along with Name of employee (clickable taking to employee details page) that performed the operation and Date of operation 
+
+Now on:
+Download Sample: download a csv file with a single sample entry for chosen segment
+Export: Download a csv file of the chosen segment and constraints
+Import: Implement export for now, i will tell instructions to implement import later.
+
+Import implementation:
+<for sample data download, fill 1 row of sample data in the sample and not real data>
+When the user uploads an excel file and chooses to import suppliers data, auto-assign a unique supplier code to each supplier
+columns expected in csv: 
+For Supplier: Name, address, supplier_type, gst_number, pan,supplier_country,tax_identification_number	bank_name_on_account	bank_name	bank_branch	bank_account_number	ifsc_code	contact_name	contact_designation	contact_phone	contact_email	item_skus 

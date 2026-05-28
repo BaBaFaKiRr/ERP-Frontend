@@ -11,3 +11,55 @@ Add a choose Purchase Order section, just like the one on create Purchase receip
 Once we choose this, we get a menu of all the Purchase receipts linked to this PO. We also get a pick option to select multiple PRs
 from these and press add button.
 This shows the PRs with each of their attached Seller's Sales invoices, received items-qty, Reported issues and any partial payments made
+
+A few fixes on generate purchase invoice page:
+1) in received items table, show the item-price (fetch from the Purchase Order) and show qty x price next to it. 
+    The item- price and quantity are autofilled but mutable
+2) Show details of the reported issues as well
+3) Now Generate Purchase Invoice -> Generates a purchase invoice for the selected PRs and is linked to the respective PO.
+4) The entries on Purchase Invoice page are clickable taking to PI details page that shows all the details we filled along with who created the PI
+, the date and time of creation.
+
+---------------------------^^^^^^This above part has been implemented^^^--------------------------------------------------
+----------------------------Please implement the below part now-----------------------------------------------------------
+To adjust any issues with a purchase, we use a Debit Note. A debit note means we are reverse-charging the supplier for any goods
+or amount.
+For the possible material issues:
+1) Item prices mismatch: If the item prices in Seller's sales invoice and Purchase Order mismatch, we issue a debit note for the 
+difference in price settling the Account.
+2) If item mismatches, that means that we order A and got B and got billed for B. For this, we mark the amount of A received as 0,
+We issue a debit note for B settling the Account
+3) If the quality of an item mismatches, we return the items x quantity of the item and issue a debit note of the same
+4) If the quantity of an item mismatches, we issue a debit note for the missing quantity
+
+In short, we issue a debit note to settle errors in purchase
+We issue a unique identifier to a debit note and log these in a "Debit Notes" page under Accounts tab
+Also if a debit note is issued against a Purchase, we link it with the PO, PR and PI (as applicable) and display them on their details page.
+
+Where can we create a debit note:
+1) On Purchase Invoice details Page, we get an option to "Issue debit Note"
+2) On Accounts-> Debit Notes page, we get a button to "Create debit note"
+
+Both of the options take us to create debit note page.
+If navigated through a PI, we autofill the applicable fields. Else, On this page, we get an option to choose a PO, PR, PI. 
+PO: Search box (single entry only)
+PR: Search box (multiple selections allowed)
+PI: Search box (multiple selections allowed)
+(choose atleast one of the above to proceed)
+-------If PO/PR/PI selected, show related details-------------
+supplier section:
+supplier: Search box (single selection only) (autofill from PO)
+supplier basic details: (autofilled from chosen supplier)
+Items Section:
+show search items from PO             <Other button>
+table columns: SKU, Item, Qty, Price (autofill from PO if an item is chosen from menu, if other button is pressed, add a row without autofill)
+Next to each row, add checkboxes: Return Item
+
+                                            Generate Debit Note button
+
+This Generates a Debit Note and shows a preview of the same. 
+If the Return Item checkbox is checked for an item, and the SKU and qty exists in stock, debit the stock for this item and qty and create a stock
+entry against this Debit note.
+
+
+
