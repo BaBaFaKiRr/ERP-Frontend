@@ -1,9 +1,17 @@
 'use client'
 
+import { ChevronDown, Building2 } from 'lucide-react'
 import { Search, Sun, Moon, LogOut } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { AssistantTrigger } from '@/components/assistant/AssistantPanel'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
+import type { OrganizationSummary } from '@/lib/organization-store'
 
 export function AppTopBar({
   mounted,
@@ -13,6 +21,9 @@ export function AppTopBar({
   onToggleAssistant,
   userLabel,
   onLogout,
+  organizations = [],
+  currentOrganization,
+  onSwitchOrganization,
 }: {
   mounted: boolean
   resolvedTheme: string | undefined
@@ -21,6 +32,9 @@ export function AppTopBar({
   onToggleAssistant: () => void
   userLabel: string
   onLogout: () => void
+  organizations?: OrganizationSummary[]
+  currentOrganization?: OrganizationSummary | null
+  onSwitchOrganization?: (id: string) => void
 }) {
   return (
     <header className="flex h-14 shrink-0 items-center gap-4 border-b border-[#151922] bg-[#1c2130] px-4 text-slate-200">
@@ -42,6 +56,40 @@ export function AppTopBar({
       </div>
 
       <div className="ml-auto flex shrink-0 items-center gap-1 sm:gap-2">
+        {currentOrganization && organizations.length > 0 ? (
+          organizations.length === 1 ? (
+            <span className="hidden max-w-[160px] truncate text-xs text-slate-400 md:inline">
+              <Building2 className="mr-1 inline size-3.5" />
+              {currentOrganization.name}
+            </span>
+          ) : (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="hidden max-w-[200px] text-slate-300 hover:bg-white/10 hover:text-white md:flex"
+                >
+                  <Building2 className="mr-1 size-4 shrink-0" />
+                  <span className="truncate">{currentOrganization.name}</span>
+                  <ChevronDown className="ml-1 size-4 shrink-0 opacity-70" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                {organizations.map((org) => (
+                  <DropdownMenuItem
+                    key={org.id}
+                    onClick={() => onSwitchOrganization?.(org.id)}
+                    className={org.id === currentOrganization.id ? 'font-medium' : ''}
+                  >
+                    {org.name}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )
+        ) : null}
         <AssistantTrigger active={assistantOpen} onClick={onToggleAssistant} />
         <Button
           type="button"

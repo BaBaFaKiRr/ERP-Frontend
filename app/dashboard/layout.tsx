@@ -13,6 +13,9 @@ import {
   ResizablePanel,
   ResizablePanelGroup,
 } from '@/components/ui/resizable'
+import { OnboardingBanner } from '@/components/dashboard/onboarding-banner'
+import { OrganizationProvider, useOrganization } from '@/lib/organization-context'
+import type { MeResponse } from '@/lib/organization-store'
 import { erpFetch } from '@/lib/erp-api'
 
 const ASSISTANT_LAYOUT_LS_KEY = 'erp-assistant-panel-layout'
@@ -36,11 +39,7 @@ function readAssistantLayout(): number[] | undefined {
   return undefined
 }
 
-export default function DashboardLayout({
-  children,
-}: {
-  children: React.ReactNode
-}) {
+function DashboardShell({ children }: { children: React.ReactNode }) {
   const [assistantOpen, setAssistantOpen] = useState(false)
   const [assistantLayout, setAssistantLayout] = useState<number[] | undefined>(undefined)
   const [mounted, setMounted] = useState(false)
@@ -48,6 +47,12 @@ export default function DashboardLayout({
   const router = useRouter()
   const supabase = createClient()
   const { resolvedTheme, setTheme } = useTheme()
+  const {
+    organizations,
+    currentOrganization,
+    switchOrganization,
+    loading: orgLoading,
+  } = useOrganization()
 
   useEffect(() => {
     setMounted(true)
@@ -62,9 +67,7 @@ export default function DashboardLayout({
     if (!mounted) return
     void (async () => {
       try {
-        const res = await erpFetch<{
-          user: { firstName?: string | null; lastName?: string | null; email: string }
-        }>('/api/me')
+        const res = await erpFetch<MeResponse>('/api/me')
         const u = res.user
         const name = `${u.firstName ?? ''} ${u.lastName ?? ''}`.trim()
         setUserLabel(name || u.email)
@@ -85,6 +88,17 @@ export default function DashboardLayout({
     setTheme,
     userLabel,
     onLogout: () => void handleLogout(),
+    organizations,
+    currentOrganization,
+    onSwitchOrganization: (id: string) => void switchOrganization(id),
+  }
+
+  if (orgLoading) {
+    return (
+      <div className="dashboard-shell flex h-screen items-center justify-center">
+        <p className="text-muted-foreground text-sm">Loading workspace…</p>
+      </div>
+    )
   }
 
   const mainCanvas = (
@@ -94,6 +108,7 @@ export default function DashboardLayout({
         assistantOpen={assistantOpen}
         onToggleAssistant={() => setAssistantOpen((o) => !o)}
       />
+      <OnboardingBanner />
       <div className="min-h-0 flex-1 overflow-auto">{children}</div>
     </div>
   )
@@ -145,5 +160,17 @@ export default function DashboardLayout({
         )}
       </div>
     </div>
+  )
+}
+
+export default function DashboardLayout({
+  children,
+}: {
+  children: React.ReactNode
+}) {
+  return (
+    <OrganizationProvider>
+      <DashboardShell>{children}</DashboardShell>
+    </OrganizationProvider>
   )
 }

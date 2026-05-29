@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/client'
+import { getActiveOrganizationId } from '@/lib/organization-store'
 
 function flattenValidationErrors(value: unknown): string[] {
   if (!value || typeof value !== 'object') return []
@@ -83,11 +84,13 @@ export async function erpFetch<T = unknown>(
     isFormData || init.body == null || typeof init.body === 'string'
       ? init.body
       : JSON.stringify(init.body)
+  const orgId = getActiveOrganizationId()
   const res = await fetch(url, {
     ...init,
     body: normalizedBody,
     headers: {
       Authorization: `Bearer ${session.access_token}`,
+      ...(orgId ? { 'X-Organization-Id': orgId } : {}),
       ...(isFormData ? {} : { 'Content-Type': 'application/json' }),
       ...(init.headers ?? {}),
     },
@@ -121,6 +124,7 @@ async function getAuthHeaders(isFormData: boolean): Promise<HeadersInit> {
 
   return {
     Authorization: `Bearer ${session.access_token}`,
+    ...(getActiveOrganizationId() ? { 'X-Organization-Id': getActiveOrganizationId()! } : {}),
     ...(isFormData ? {} : { 'Content-Type': 'application/json' }),
   }
 }

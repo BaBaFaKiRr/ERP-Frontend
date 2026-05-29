@@ -16,6 +16,9 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
 import { LEJER_LOGO_MARK_SRC } from '@/lib/branding'
+import { erpFetch } from '@/lib/erp-api'
+import { resolvePostAuthPath } from '@/lib/post-auth-routing'
+import type { MeResponse } from '@/lib/organization-store'
 
 export default function Page() {
   const [email, setEmail] = useState('')
@@ -41,7 +44,8 @@ export default function Page() {
         },
       })
       if (error) throw error
-      router.push('/dashboard')
+      const me = await erpFetch<MeResponse>('/api/me')
+      router.push(resolvePostAuthPath(me))
     } catch (error: unknown) {
       setError(error instanceof Error ? error.message : 'An error occurred')
     } finally {

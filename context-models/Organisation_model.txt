@@ -1,0 +1,412 @@
+# LEJER Multi-Tenant Migration Plan
+
+## Objective
+
+Convert LEJER from a single-organization ERP into a multi-tenant SaaS ERP where:
+
+* Multiple organizations can sign up and use LEJER.
+* Each organization can manage its own users, employees, inventory, accounting, projects, etc.
+* Data is logically isolated by organization.
+* LEJER platform administrators can view and manage all organizations.
+* We will use a shared-schema multi-tenant architecture.
+* We will continue using a single Supabase project and a single PostgreSQL database.
+
+---
+
+# Important Architectural Decision
+
+We are NOT creating:
+
+* Separate databases per customer
+* Separate Supabase projects per customer
+* Separate schemas per customer
+* Separate copies of ERP tables per customer
+
+Instead:
+
+Every business record belongs to an organization using:
+
+```sql
+organization_id UUID NOT NULL
+```
+
+All organizations share the same tables.
+
+---
+
+# New Core Tables
+
+## organizations
+
+Create a table:
+
+```sql
+organizations (
+    id UUID PRIMARY KEY,
+    name TEXT NOT NULL,
+    slug TEXT UNIQUE,
+    created_at TIMESTAMP DEFAULT NOW(),
+    status TEXT DEFAULT 'active',
+    subscription_plan TEXT DEFAULT 'free'
+)
+```
+
+Purpose:
+
+* Represents a company using LEJER.
+* Every ERP record belongs to one organization.
+
+---
+
+## organization_users
+
+Create a membership table:
+
+```sql
+organization_users (
+    id UUID PRIMARY KEY,
+    organization_id UUID REFERENCES organizations(id),
+    user_id UUID REFERENCES auth.users(id),
+    role TEXT NOT NULL,
+    created_at TIMESTAMP DEFAULT NOW()
+)
+```
+
+Supported roles:
+
+```text
+owner
+admin
+manager
+employee
+accountant
+hr
+```
+
+Purpose:
+
+* Determines which users belong to which organization.
+* Supports future multi-organization access.
+
+---
+
+## profiles
+
+Create or extend existing user profile table:
+
+```sql
+profiles (
+    user_id UUID PRIMARY KEY,
+    full_name TEXT,
+    phone TEXT,
+    created_at TIMESTAMP DEFAULT NOW()
+)
+```
+
+---
+
+# Database Migration
+
+For EVERY ERP table, add:
+
+```sql
+organization_id UUID NOT NULL
+```
+
+Examples:
+
+```sql
+employees
+customers
+vendors
+projects
+tasks
+attendance
+inventory_items
+purchase_orders
+sales_orders
+invoices
+payments
+expenses
+assets
+departments
+leave_requests
+payroll
+```
+
+All business data must belong to an organization.
+
+---
+
+# Existing Data Migration
+
+Create a default organization:
+
+```text
+LEJER Internal
+```
+
+or
+
+```text
+Current Organization
+```
+
+Assign all existing records to this organization.
+
+Example:
+
+```sql
+UPDATE invoices
+SET organization_id = '<default-org-id>';
+```
+
+Repeat for all existing business tables.
+
+After migration:
+
+```sql
+ALTER TABLE invoices
+ALTER COLUMN organization_id SET NOT NULL;
+```
+
+Repeat for every table.
+
+---
+
+# Indexing Requirements
+
+For every business table create:
+
+```sql
+CREATE INDEX idx_<table>_org
+ON <table>(organization_id);
+```
+
+Examples:
+
+```sql
+CREATE INDEX idx_invoices_org
+ON invoices(organization_id);
+
+CREATE INDEX idx_employees_org
+ON employees(organization_id);
+
+CREATE INDEX idx_inventory_org
+ON inventory_items(organization_id);
+```
+
+For heavily queried tables:
+
+```sql
+CREATE INDEX idx_invoice_org_created
+ON invoices(organization_id, created_at DESC);
+```
+
+---
+
+# Application Context
+
+Introduce a concept called:
+
+```ts
+currentOrganizationId
+```
+
+The application should always know which organization the user is currently operating within.
+
+This value should be available globally:
+
+```ts
+OrganizationContext
+```
+
+or equivalent application state.
+
+---
+
+# Query Requirements
+
+All business queries must be organization-scoped.
+
+BAD:
+
+```ts
+supabase
+  .from("invoices")
+  .select("*");
+```
+
+GOOD:
+
+```ts
+supabase
+  .from("invoices")
+  .select("*")
+  .eq("organization_id", currentOrganizationId);
+```
+
+This rule applies everywhere.
+
+Never fetch business records without organization filtering.
+
+---
+
+# Create Operations
+
+Whenever a new record is created:
+
+```ts
+organization_id = currentOrganizationId
+```
+
+must automatically be inserted.
+
+Example:
+
+```ts
+await supabase
+  .from("customers")
+  .insert({
+      organization_id: currentOrganizationId,
+      ...
+  });
+```
+
+---
+
+# Update Operations
+
+All updates should verify ownership:
+
+```ts
+.eq("organization_id", currentOrganizationId)
+```
+
+Example:
+
+```ts
+await supabase
+  .from("invoices")
+  .update(...)
+  .eq("id", invoiceId)
+  .eq("organization_id", currentOrganizationId);
+```
+
+---
+
+# Delete Operations
+
+Same rule:
+
+```ts
+.eq("organization_id", currentOrganizationId)
+```
+
+must always be included.
+
+---
+
+# Authentication Flow
+
+When a user logs in:
+
+1. Fetch organization memberships.
+
+```sql
+organization_users
+```
+
+2. Determine organization role.
+
+3. Determine active organization.
+
+4. Store active organization in session/context.
+
+---
+
+# Organization Signup Flow
+
+When a company registers:
+
+1. Create organization record.
+2. Create organization_users record.
+3. Set creator role = owner.
+4. Redirect into organization dashboard.
+
+No new tables should be created.
+
+No new database should be created.
+
+No new schema should be created.
+
+---
+
+# Invitation System
+
+Create:
+
+```sql
+invitations (
+    id UUID PRIMARY KEY,
+    organization_id UUID REFERENCES organizations(id),
+    email TEXT NOT NULL,
+    role TEXT NOT NULL,
+    token TEXT NOT NULL,
+    expires_at TIMESTAMP
+)
+```
+
+Flow:
+
+1. Organization admin invites user.
+2. User accepts invitation.
+3. Create organization_users record.
+4. User gains access to organization.
+
+---
+
+# Row Level Security (Future Phase)
+
+Do not implement immediately unless simple.
+
+Prepare schema so that Supabase RLS can later enforce:
+
+```sql
+organization_id IN (
+    SELECT organization_id
+    FROM organization_users
+    WHERE user_id = auth.uid()
+)
+```
+
+This will provide database-level tenant isolation.
+
+---
+
+# Platform Admin Support
+
+Create a platform-level admin concept.
+
+Platform admins can:
+
+* View all organizations
+* View organization statistics
+* Suspend organizations
+* Manage subscriptions
+
+This role should be separate from organization roles.
+
+---
+
+# Expected Result
+
+Final architecture:
+
+One Supabase Project
+→ One PostgreSQL Database
+→ One Shared Schema
+→ Many Organizations
+→ All ERP tables filtered using organization_id
+
+This is the desired long-term architecture for LEJER.

@@ -189,7 +189,6 @@ export default function DashboardPage() {
     activeWorkOrders: 0,
     purchasePendingApprovals: 0,
   })
-
   const isAdmin = me?.role === 'admin'
   const displayName = `${me?.firstName ?? ''} ${me?.lastName ?? ''}`.trim()
 

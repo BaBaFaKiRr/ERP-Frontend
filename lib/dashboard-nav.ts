@@ -8,7 +8,8 @@ import {
   Package2,
   Users,
   Truck,
-  Settings,
+  Cog,
+  Shield,
 } from 'lucide-react'
 
 export type NavChild = { name: string; href: string }
@@ -155,9 +156,15 @@ export const MAIN_NAV: NavItem[] = [
     match: (p) => p.startsWith('/dashboard/dispatch'),
   },
   {
+    name: 'Settings',
+    href: '/dashboard/settings',
+    icon: Cog,
+    match: (p) => p.startsWith('/dashboard/settings'),
+  },
+  {
     name: 'Admin',
     href: '/dashboard/admin',
-    icon: Settings,
+    icon: Shield,
     match: (p) => p.startsWith('/dashboard/admin'),
   },
 ]
