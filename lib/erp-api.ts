@@ -1,6 +1,39 @@
 import { createClient } from '@/lib/supabase/client'
 import { getActiveOrganizationId } from '@/lib/organization-store'
 
+let cachedAccessToken: string | null = null
+let cachedAccessTokenExpiresAt = 0
+
+async function getAccessToken(): Promise<string> {
+  const now = Date.now()
+  if (cachedAccessToken && cachedAccessTokenExpiresAt > now + 60_000) {
+    return cachedAccessToken
+  }
+
+  const supabase = createClient()
+  const {
+    data: { session },
+  } = await supabase.auth.getSession()
+
+  if (!session?.access_token) {
+    cachedAccessToken = null
+    cachedAccessTokenExpiresAt = 0
+    throw new Error('Not authenticated')
+  }
+
+  cachedAccessToken = session.access_token
+  cachedAccessTokenExpiresAt = session.expires_at
+    ? session.expires_at * 1000
+    : now + 3_600_000
+
+  return session.access_token
+}
+
+export function clearCachedAccessToken() {
+  cachedAccessToken = null
+  cachedAccessTokenExpiresAt = 0
+}
+
 function flattenValidationErrors(value: unknown): string[] {
   if (!value || typeof value !== 'object') return []
   const obj = value as Record<string, unknown>
@@ -69,14 +102,7 @@ export async function erpFetch<T = unknown>(
   path: string,
   init: ErpFetchInit = {},
 ): Promise<T> {
-  const supabase = createClient()
-  const {
-    data: { session },
-  } = await supabase.auth.getSession()
-
-  if (!session?.access_token) {
-    throw new Error('Not authenticated')
-  }
+  const accessToken = await getAccessToken()
 
   const url = `${getBaseUrl()}${path.startsWith('/') ? path : `/${path}`}`
   const isFormData = typeof FormData !== 'undefined' && init.body instanceof FormData
@@ -89,7 +115,7 @@ export async function erpFetch<T = unknown>(
     ...init,
     body: normalizedBody,
     headers: {
-      Authorization: `Bearer ${session.access_token}`,
+      Authorization: `Bearer ${accessToken}`,
       ...(orgId ? { 'X-Organization-Id': orgId } : {}),
       ...(isFormData ? {} : { 'Content-Type': 'application/json' }),
       ...(init.headers ?? {}),
@@ -113,17 +139,10 @@ export async function erpFetch<T = unknown>(
 }
 
 async function getAuthHeaders(isFormData: boolean): Promise<HeadersInit> {
-  const supabase = createClient()
-  const {
-    data: { session },
-  } = await supabase.auth.getSession()
-
-  if (!session?.access_token) {
-    throw new Error('Not authenticated')
-  }
+  const accessToken = await getAccessToken()
 
   return {
-    Authorization: `Bearer ${session.access_token}`,
+    Authorization: `Bearer ${accessToken}`,
     ...(getActiveOrganizationId() ? { 'X-Organization-Id': getActiveOrganizationId()! } : {}),
     ...(isFormData ? {} : { 'Content-Type': 'application/json' }),
   }

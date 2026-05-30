@@ -144,11 +144,8 @@
     @apply bg-background text-app-text-primary;
   }
   html.dark {
-    background-color: #000000;
-    background-image:
-      radial-gradient(ellipse 90% 70% at 0% 50%, rgba(59, 130, 246, 0.35) 0%, transparent 55%),
-      linear-gradient(180deg, #000000 0%, #050505 28%, #0d1b2a 50%, #0a1525 72%, #000000 100%);
-    background-attachment: fixed;
+    background-color: #0f1219;
+    background-image: none;
     min-height: 100%;
   }
   html.dark body {
@@ -168,37 +165,25 @@
   }
 
   html.dark .dashboard-shell {
-    background: #000000;
+    background: #1c2130;
   }
 
   html.dark .erp-main-canvas {
-    background: transparent;
+    background: #0f1219;
   }
 
   html.dark .dashboard-shell.dashboard-colorful-accents {
-    background-color: #000000;
-    background-image:
-      radial-gradient(ellipse 90% 70% at 0% 50%, rgba(59, 130, 246, 0.35) 0%, transparent 55%),
-      radial-gradient(ellipse 75% 60% at 100% 10%, rgba(192, 38, 211, 0.35) 0%, transparent 55%),
-      radial-gradient(ellipse 75% 60% at 100% 90%, rgba(34, 197, 94, 0.35) 0%, transparent 55%),
-      linear-gradient(180deg, #000000 0%, #050505 28%, #0d1b2a 50%, #0a1525 72%, #000000 100%);
-    background-attachment: fixed;
+    background-color: #1c2130;
+    background-image: none;
   }
 
   html.dark .dashboard-dark-bg {
-    background-color: #000000 !important;
-    background-image:
-      radial-gradient(ellipse 90% 70% at 0% 50%, rgba(59, 130, 246, 0.35) 0%, transparent 55%),
-      linear-gradient(180deg, #000000 0%, #050505 28%, #0d1b2a 50%, #0a1525 72%, #000000 100%) !important;
-    background-attachment: fixed;
+    background-color: #0f1219 !important;
+    background-image: none !important;
   }
 
   html.dark .dashboard-dark-bg.dashboard-colorful-accents {
-    background-image:
-      radial-gradient(ellipse 90% 70% at 0% 50%, rgba(59, 130, 246, 0.35) 0%, transparent 55%),
-      radial-gradient(ellipse 75% 60% at 100% 10%, rgba(192, 38, 211, 0.35) 0%, transparent 55%),
-      radial-gradient(ellipse 75% 60% at 100% 90%, rgba(34, 197, 94, 0.35) 0%, transparent 55%),
-      linear-gradient(180deg, #000000 0%, #050505 28%, #0d1b2a 50%, #0a1525 72%, #000000 100%) !important;
-    background-attachment: fixed;
+    background-color: #0f1219 !important;
+    background-image: none !important;
   }
 }

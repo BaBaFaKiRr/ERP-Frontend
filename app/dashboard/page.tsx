@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { erpFetch } from '@/lib/erp-api'
+import { useOrganization } from '@/lib/organization-context'
 import { DashboardWidget } from '@/components/dashboard/dashboard-widget'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
@@ -192,16 +193,11 @@ export default function DashboardPage() {
   const isAdmin = me?.role === 'admin'
   const displayName = `${me?.firstName ?? ''} ${me?.lastName ?? ''}`.trim()
 
+  const { me: meProfile } = useOrganization()
+
   useEffect(() => {
-    void (async () => {
-      try {
-        const meRes = await erpFetch<{ user: MeUser }>('/api/me')
-        setMe(meRes.user ?? null)
-      } catch {
-        setMe(null)
-      }
-    })()
-  }, [])
+    setMe(meProfile?.user ?? null)
+  }, [meProfile])
 
   const loadDashboard = async () => {
     setLoading(true)

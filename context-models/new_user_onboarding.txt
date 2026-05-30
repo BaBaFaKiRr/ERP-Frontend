@@ -1,0 +1,43 @@
+Build a production-grade first-time onboarding experience for LEJER similar to Zoho, Odoo, and modern SaaS ERPs.
+
+After signup, redirect users to a dedicated onboarding flow before showing the dashboard.
+
+Step 1: Collect user details (name, designation, phone).
+
+Step 2: Collect organization details (company name, GSTIN, industry, business type, fiscal year start, base currency, timezone, address).
+
+Step 3: Create organization and assign user as Owner.
+
+Step 4: Show a persistent onboarding checklist with progress tracking stored in the database.
+
+Checklist items:
+
+* Complete company profile
+* Add employees
+* Import customers
+* Import suppliers/vendors
+* Import products/inventory
+* Configure warehouses
+* Configure chart of accounts
+* Invite team members
+* Create first invoice
+* Create first purchase order
+
+Each item should support:
+
+* Skip for now
+* Mark complete automatically when data exists
+* Resume later
+
+Show onboarding progress (0-100%) on the dashboard until completed.
+
+Users must be able to leave onboarding and continue later from a "Getting Started" widget.
+
+Create database tables:
+
+* onboarding_progress
+* onboarding_tasks
+
+All onboarding data must be scoped by organization_id.
+
+Design should feel enterprise-grade, clean, minimal, and fast, with guided empty states and sample import templates for each data-import step.

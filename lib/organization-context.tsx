@@ -13,6 +13,7 @@ import { useRouter, usePathname } from 'next/navigation'
 import {
   getActiveOrganizationId,
   setActiveOrganizationId,
+  type MeOnboardingSummary,
   type MeResponse,
   type OrganizationSummary,
 } from '@/lib/organization-store'
@@ -21,6 +22,8 @@ import { shouldAutoRedirectToChecklist } from '@/lib/post-auth-routing'
 
 type OrganizationContextValue = {
   loading: boolean
+  me: MeResponse | null
+  onboarding: MeOnboardingSummary | null
   organizations: OrganizationSummary[]
   currentOrganizationId: string | null
   currentOrganization: OrganizationSummary | null
@@ -37,30 +40,32 @@ export function OrganizationProvider({ children }: { children: ReactNode }) {
   const router = useRouter()
   const pathname = usePathname()
   const [loading, setLoading] = useState(true)
+  const [me, setMe] = useState<MeResponse | null>(null)
   const [organizations, setOrganizations] = useState<OrganizationSummary[]>([])
   const [currentOrganizationId, setCurrentOrganizationId] = useState<string | null>(null)
   const [moduleRoles, setModuleRoles] = useState<string[]>([])
   const [membershipRole, setMembershipRole] = useState<string | null>(null)
   const [isPlatformAdmin, setIsPlatformAdmin] = useState(false)
 
-  const applyMe = useCallback((me: MeResponse) => {
-    const orgs = me.organizations ?? []
+  const applyMe = useCallback((next: MeResponse) => {
+    const orgs = next.organizations ?? []
+    setMe(next)
     setOrganizations(orgs)
-    setIsPlatformAdmin(!!me.isPlatformAdmin)
-    setModuleRoles(me.moduleRoles ?? [])
+    setIsPlatformAdmin(!!next.isPlatformAdmin)
+    setModuleRoles(next.moduleRoles ?? [])
 
     const stored = getActiveOrganizationId()
     const validStored = stored && orgs.some((o) => o.id === stored) ? stored : null
     const activeId =
       validStored ??
-      me.activeOrganization?.id ??
+      next.activeOrganization?.id ??
       (orgs.length === 1 ? orgs[0].id : null)
 
     if (activeId) {
       setActiveOrganizationId(activeId)
       setCurrentOrganizationId(activeId)
       const org = orgs.find((o) => o.id === activeId)
-      setMembershipRole(org?.membershipRole ?? me.activeOrganization?.membershipRole ?? null)
+      setMembershipRole(org?.membershipRole ?? next.activeOrganization?.membershipRole ?? null)
     } else {
       setActiveOrganizationId(null)
       setCurrentOrganizationId(null)
@@ -71,31 +76,35 @@ export function OrganizationProvider({ children }: { children: ReactNode }) {
   const refresh = useCallback(async () => {
     setLoading(true)
     try {
-      const me = await erpFetch<MeResponse>('/api/me')
-      applyMe(me)
-      const needsSetup =
-        me.onboarding?.needsSetupWizard ?? me.onboarding?.needsWizard ?? false
-
-      if (needsSetup && !pathname?.startsWith('/onboarding')) {
-        router.replace('/onboarding')
-        return
-      }
-
-      if (
-        shouldAutoRedirectToChecklist(me) &&
-        pathname?.startsWith('/dashboard') &&
-        !pathname?.startsWith('/onboarding')
-      ) {
-        router.replace('/onboarding')
-      }
+      const next = await erpFetch<MeResponse>('/api/me')
+      applyMe(next)
     } finally {
       setLoading(false)
     }
-  }, [applyMe, router, pathname])
+  }, [applyMe])
 
   useEffect(() => {
     void refresh()
   }, [refresh])
+
+  useEffect(() => {
+    if (loading || !me) return
+
+    const needsSetup = me.onboarding?.needsSetupWizard ?? me.onboarding?.needsWizard ?? false
+
+    if (needsSetup && !pathname?.startsWith('/onboarding')) {
+      router.replace('/onboarding')
+      return
+    }
+
+    if (
+      shouldAutoRedirectToChecklist(me) &&
+      pathname?.startsWith('/dashboard') &&
+      !pathname?.startsWith('/onboarding')
+    ) {
+      router.replace('/onboarding')
+    }
+  }, [loading, me, pathname, router])
 
   const switchOrganization = useCallback(
     async (organizationId: string) => {
@@ -117,6 +126,8 @@ export function OrganizationProvider({ children }: { children: ReactNode }) {
   const value = useMemo(
     () => ({
       loading,
+      me,
+      onboarding: me?.onboarding ?? null,
       organizations,
       currentOrganizationId,
       currentOrganization,
@@ -128,6 +139,7 @@ export function OrganizationProvider({ children }: { children: ReactNode }) {
     }),
     [
       loading,
+      me,
       organizations,
       currentOrganizationId,
       currentOrganization,

@@ -1,35 +1,14 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
 import { ChevronRight } from 'lucide-react'
-import { erpFetch } from '@/lib/erp-api'
-import type { MeResponse } from '@/lib/organization-store'
+import { useOrganization } from '@/lib/organization-context'
 import { Progress } from '@/components/ui/progress'
 
 export function OnboardingBanner() {
-  const [summary, setSummary] = useState<MeResponse['onboarding'] | null>(null)
+  const { onboarding } = useOrganization()
 
-  const load = useCallback(async () => {
-    try {
-      const me = await erpFetch<MeResponse>('/api/me')
-      setSummary(me.onboarding ?? null)
-    } catch {
-      setSummary(null)
-    }
-  }, [])
-
-  useEffect(() => {
-    void load()
-  }, [load])
-
-  useEffect(() => {
-    const onFocus = () => void load()
-    window.addEventListener('focus', onFocus)
-    return () => window.removeEventListener('focus', onFocus)
-  }, [load])
-
-  if (!summary?.showOnboardingBanner) return null
+  if (!onboarding?.showOnboardingBanner) return null
 
   return (
     <Link
@@ -41,10 +20,10 @@ export function OnboardingBanner() {
           Complete your LEJER setup
         </p>
         <p className="text-xs text-amber-800/90 dark:text-amber-200/80">
-          {summary.progressPercent}% done — import data, configure modules, and invite your team
+          {onboarding.progressPercent}% done — import data, configure modules, and invite your team
         </p>
         <Progress
-          value={summary.progressPercent}
+          value={onboarding.progressPercent}
           className="mt-2 h-1.5 bg-amber-200/80 dark:bg-amber-900/60 [&>div]:bg-amber-600"
         />
       </div>
