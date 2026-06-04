@@ -7,6 +7,8 @@ import { usePathname } from 'next/navigation'
 import { cn } from '@/lib/utils'
 import { LEJER_LOGO_MARK_SRC } from '@/lib/branding'
 import { MAIN_NAV, childActive, type NavItem } from '@/lib/dashboard-nav'
+import { filterNavForPermissions } from '@/lib/nav-permissions'
+import { useOrganization } from '@/lib/organization-context'
 
 function NavFlyout({
   item,
@@ -68,6 +70,8 @@ function NavFlyout({
 export function AppSidebar() {
   const pathname = usePathname()
   const [flyout, setFlyout] = useState<string | null>(null)
+  const { permissions, permissionBypass } = useOrganization()
+  const navItems = filterNavForPermissions(MAIN_NAV, permissions, permissionBypass)
 
   return (
     <aside className="relative z-40 flex h-full w-[72px] shrink-0 flex-col border-r border-[#151922] bg-[#1c2130] text-slate-300">
@@ -85,7 +89,7 @@ export function AppSidebar() {
       </div>
 
       <nav className="flex flex-1 flex-col gap-1 overflow-y-auto overflow-x-hidden py-2 scrollbar-thin">
-        {MAIN_NAV.map((item) => {
+        {navItems.map((item) => {
           const active = item.match?.(pathname) ?? false
           const Icon = item.icon
           const hasChildren = Boolean(item.children?.length)

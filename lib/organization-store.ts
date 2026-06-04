@@ -52,6 +52,8 @@ export type MeResponse = {
   organizations: OrganizationSummary[]
   activeOrganization: { id: string; name: string; slug: string; membershipRole: string } | null
   moduleRoles: string[]
+  permissions?: string[]
+  permissionBypass?: boolean
   onboarding: MeOnboardingSummary
 }
 

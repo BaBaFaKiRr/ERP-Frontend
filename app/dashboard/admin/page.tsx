@@ -1,5 +1,6 @@
 'use client'
 
+import Link from 'next/link'
 import {
   Card,
   CardContent,
@@ -8,7 +9,7 @@ import {
   CardTitle,
 } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Plus } from 'lucide-react'
+import { Shield } from 'lucide-react'
 
 export default function AdminPage() {
   return (
@@ -23,11 +24,30 @@ export default function AdminPage() {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <Card>
           <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Shield className="h-5 w-5" />
+              Permissions
+            </CardTitle>
+            <CardDescription>
+              View and edit module-wise ERP access for employees with login
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Button className="w-full" asChild>
+              <Link href="/dashboard/admin/permissions">Manage Permissions</Link>
+            </Button>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
             <CardTitle>User Management</CardTitle>
             <CardDescription>Manage system users and roles</CardDescription>
           </CardHeader>
           <CardContent>
-            <Button className="w-full">Manage Users</Button>
+            <Button className="w-full" variant="outline" disabled>
+              Coming soon
+            </Button>
           </CardContent>
         </Card>
 

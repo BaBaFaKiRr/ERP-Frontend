@@ -95,6 +95,7 @@ export default function EmployeeDetailsPage() {
   const { membershipRole, moduleRoles, me } = useOrganization()
   const [inviteOpen, setInviteOpen] = useState(false)
   const [inviteUrl, setInviteUrl] = useState<string | null>(null)
+  const [inviteExpiresAt, setInviteExpiresAt] = useState<string | null>(null)
   const [inviteLoading, setInviteLoading] = useState(false)
   const [revokeLoading, setRevokeLoading] = useState(false)
   const [copied, setCopied] = useState(false)
@@ -198,6 +199,7 @@ export default function EmployeeDetailsPage() {
         resetEditForm(res.data)
         if (res.data.erp_access?.pendingInvitation?.inviteUrl) {
           setInviteUrl(res.data.erp_access.pendingInvitation.inviteUrl)
+          setInviteExpiresAt(res.data.erp_access.pendingInvitation.expiresAt ?? null)
         }
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to load employee')
@@ -306,10 +308,12 @@ export default function EmployeeDetailsPage() {
     setInviteLoading(true)
     setError(null)
     try {
-      const res = await erpFetch<{ inviteUrl: string }>(`/api/employees/${employee.id}/invite`, {
-        method: 'POST',
-      })
+      const res = await erpFetch<{ inviteUrl: string; expiresAt: string }>(
+        `/api/employees/${employee.id}/invite`,
+        { method: 'POST' },
+      )
       setInviteUrl(res.inviteUrl)
+      setInviteExpiresAt(res.expiresAt)
       setInviteOpen(true)
       await reload()
     } catch (err) {
@@ -338,6 +342,7 @@ export default function EmployeeDetailsPage() {
     try {
       await erpFetch(`/api/employees/${employee.id}/revoke-login`, { method: 'POST' })
       setInviteUrl(null)
+      setInviteExpiresAt(null)
       await reload()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to revoke login')
@@ -383,18 +388,13 @@ export default function EmployeeDetailsPage() {
                 variant="outline"
                 disabled={!canInvite || inviteLoading}
                 className={cn(!canInvite && 'pointer-events-none opacity-50')}
-                onClick={() => {
-                  if (!canInvite) return
-                  const existing = employee.erp_access?.pendingInvitation?.inviteUrl
-                  if (existing) {
-                    setInviteUrl(existing)
-                    setInviteOpen(true)
-                  } else {
-                    void createInvite()
-                  }
-                }}
+                onClick={() => void createInvite()}
               >
-                {inviteLoading ? 'Generating…' : 'Invite to ERP'}
+                {inviteLoading
+                  ? 'Generating…'
+                  : employee.erp_access?.pendingInvitation
+                    ? 'Regenerate invite link'
+                    : 'Invite to ERP'}
               </Button>
             ) : null}
             {isOrgAdmin ? (
@@ -452,8 +452,12 @@ export default function EmployeeDetailsPage() {
 
       {hasErpLogin && employee?.erp_access?.loginEmail ? (
         <p className="text-sm text-muted-foreground">
-          ERP login:{' '}
+          ERP login email (sign-in):{' '}
           <span className="font-medium text-foreground">{employee.erp_access.loginEmail}</span>
+          <span className="block text-xs">
+            This is separate from the work contact email below. Changing contact email does not change ERP
+            sign-in.
+          </span>
         </p>
       ) : null}
 
@@ -462,8 +466,8 @@ export default function EmployeeDetailsPage() {
           <DialogHeader>
             <DialogTitle>Invite to LEJER ERP</DialogTitle>
             <DialogDescription>
-              Share this one-time link with {employee?.full_name ?? 'the employee'}. It expires in
-              36 hours.
+              Share this one-time link with {employee?.full_name ?? 'the employee'}. Each new invite
+              invalidates any previous link. Valid for 36 hours from when it was generated.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-3">
@@ -473,6 +477,11 @@ export default function EmployeeDetailsPage() {
                 {copied ? <Check className="size-4" /> : <Copy className="size-4" />}
               </Button>
             </div>
+            {inviteExpiresAt ? (
+              <p className="text-muted-foreground text-xs">
+                Expires: {new Date(inviteExpiresAt).toLocaleString('en-IN')}
+              </p>
+            ) : null}
             <p className="text-muted-foreground text-xs">
               The employee sets a password, verifies their email, then signs in to your organization
               workspace.

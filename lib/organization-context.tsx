@@ -28,6 +28,8 @@ type OrganizationContextValue = {
   currentOrganizationId: string | null
   currentOrganization: OrganizationSummary | null
   moduleRoles: string[]
+  permissions: string[]
+  permissionBypass: boolean
   membershipRole: string | null
   isPlatformAdmin: boolean
   refresh: () => Promise<void>
@@ -44,6 +46,8 @@ export function OrganizationProvider({ children }: { children: ReactNode }) {
   const [organizations, setOrganizations] = useState<OrganizationSummary[]>([])
   const [currentOrganizationId, setCurrentOrganizationId] = useState<string | null>(null)
   const [moduleRoles, setModuleRoles] = useState<string[]>([])
+  const [permissions, setPermissions] = useState<string[]>([])
+  const [permissionBypass, setPermissionBypass] = useState(false)
   const [membershipRole, setMembershipRole] = useState<string | null>(null)
   const [isPlatformAdmin, setIsPlatformAdmin] = useState(false)
 
@@ -53,6 +57,8 @@ export function OrganizationProvider({ children }: { children: ReactNode }) {
     setOrganizations(orgs)
     setIsPlatformAdmin(!!next.isPlatformAdmin)
     setModuleRoles(next.moduleRoles ?? [])
+    setPermissions(next.permissions ?? [])
+    setPermissionBypass(!!next.permissionBypass)
 
     const stored = getActiveOrganizationId()
     const validStored = stored && orgs.some((o) => o.id === stored) ? stored : null
@@ -132,6 +138,8 @@ export function OrganizationProvider({ children }: { children: ReactNode }) {
       currentOrganizationId,
       currentOrganization,
       moduleRoles,
+      permissions,
+      permissionBypass,
       membershipRole,
       isPlatformAdmin,
       refresh,
@@ -144,6 +152,8 @@ export function OrganizationProvider({ children }: { children: ReactNode }) {
       currentOrganizationId,
       currentOrganization,
       moduleRoles,
+      permissions,
+      permissionBypass,
       membershipRole,
       isPlatformAdmin,
       refresh,

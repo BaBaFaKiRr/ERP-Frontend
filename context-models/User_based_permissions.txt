@@ -1,0 +1,275 @@
+# User-based permissions — Phase 1 (inventory & design)
+
+Status: **Phase 1 complete** — module/resource/action catalog for implementation in later phases.
+See also: `invite_user.txt`, `Organisation_model.txt`, `FLOW.md` §3.
+
+---
+
+## 1. Product intent
+
+- **Organization creator** → `organization_users.membership_role = owner` + module role `erp_admin` (full ERP access; bypasses `requireRole` gates when membership is owner/admin).
+- **Invited employees** (HR → employee detail → **Invite to ERP**) → `membership_role = member` + **one** module role derived from department (`moduleRoleForDepartment` in `ERP-Backend/src/services/employee-invitation.ts`).
+- **Target (Phase 2+)** → per-user, per-resource permissions (e.g. `accounts.sales_invoices.create`) stored in DB and enforced in API + UI, with **admin** able to customize grants per user beyond the department default.
+
+Today the app uses **coarse module roles**, not granular permissions. Phase 1 defines the granular matrix to build next.
+
+---
+
+## 2. Access layers (today vs future)
+
+| Layer | Storage | Effect today |
+|-------|---------|--------------|
+| **Membership** | `organization_users.membership_role` | `owner` / `admin` → all `requireRole` checks pass |
+| **Module role** | `organization_user_roles.role` | One or more of: `erp_admin`, `accountant`, `store`, `production`, `sales` |
+| **Legacy profile** | `public.users.role` | Mostly legacy; invite still inserts `sales` |
+| **Granular permission** | *(not implemented)* | Phase 2: `user_permissions` or JSON on membership |
+
+**Module role → department default (invite):**
+
+| Employee department | Module role assigned |
+|--------------------|----------------------|
+| Sales, Impex, General Staff | `sales` |
+| Production, Quality | `production` |
+| Store, Dispatch | `store` |
+| Accounts | `accountant` |
+| Human Resources, Management | `erp_admin` |
+| *(other / empty)* | `sales` |
+
+---
+
+## 3. Permission action vocabulary
+
+Use these action codes consistently in Phase 2 schema and UI:
+
+| Code | Meaning |
+|------|---------|
+| `fetch` | List / read / export PDF / preview |
+| `create` | Insert new document or master record |
+| `update` | Edit draft or mutable fields |
+| `delete` | Hard or soft delete / cancel document |
+| `approve` | Single-step approval (admin-only today for many docs) |
+| `reject` | Reject pending approval |
+| `request` | Submit for approval or raise a request queue item |
+| `dispatch` | Physical dispatch / issue stock against invoice |
+| `import` | Bulk import via data-import-export |
+| `export` | Bulk export |
+| `settings` | Org/module configuration (terms, invoice profiles, etc.) |
+
+**Special rules (from FLOW.md — keep in enforcement):**
+
+- Documents created by **admin / owner / erp_admin** often skip approval for the same action type.
+- **Accounts / finance**: sensitive; default deny for `sales`, `store`, `production` unless explicitly granted.
+- **Read-only** module access: grant only `fetch` (+ `export` if needed).
+
+---
+
+## 4. Application modules (UI + API)
+
+Aligned with `ERP-Frontend/lib/dashboard-nav.ts` and `ERP-Backend/src/routes/index.ts`.
+
+| Module | UI section | Primary API prefixes |
+|--------|------------|----------------------|
+| **Platform** | — | `/platform` |
+| **Organization** | onboarding, org-setup, settings | `/organizations`, `/onboarding`, `/me` |
+| **Home / Analytics** | `/dashboard` | `/analytics` |
+| **Sales** | Sales | `/sales-orders`, `/customers` |
+| **Purchase** | Purchase | `/purchase`, `/purchase-settings`, `/suppliers` |
+| **Inventory** | Inventory | `/items`, `/inventory`, `/stock-entries`, `/bom`, `/shortages`, `/material-issue-requests`, `/material-deposit-requests` |
+| **Manufacturing** | Mfg | `/work-orders`, `/material-entries`, `/production-lines`, `/planning` |
+| **Accounts (Finance)** | Accounts | `/sales-invoices`, `/dispatch-sales-invoices`, `/accounts`, `/payments`, `/payment-entries`, `/general-entries`, `/journal-entries`, `/credit-notes`, `/debit-notes`, `/invoice-settings` + purchase invoices under `/purchase` |
+| **Dispatch** | Dispatch | `/dispatch` |
+| **HR / People** | People | `/employees`, `/invitations` |
+| **Data tools** | import-export | `/data-import-export` |
+| **AI Assistant** | *(in-app)* | `/assistant` |
+| **Admin** | Admin | org admin / platform (future permission UI) |
+
+---
+
+## 5. Module-wise permission catalog
+
+Format: `resource.action` — **Suggested default for invited `member`** is the department’s module role with only safe actions; **Admin/owner** = all actions.
+
+### 5.1 Organization & access
+
+| Resource | Actions | Notes / today |
+|----------|---------|---------------|
+| `organization.create` | create | Sign-up / POST `/organizations` → creator = owner |
+| `organization.view` | fetch | List/switch org |
+| `organization.settings` | update, settings | Org profile, onboarding wizard |
+| `organization.members` | fetch, create, update, delete | Future: assign permissions |
+| `organization.invite` | create | HR invite link; today: `requireRole('admin')` on POST `employees/:id/invite` |
+| `organization.revoke_login` | delete | Admin only |
+| `platform.admin` | fetch, update | `platform_admins` only |
+
+### 5.2 Sales
+
+| Resource | Actions | Today (`requireRole` on writes / sensitive reads) |
+|----------|---------|-----------------------------------------------------|
+| `sales.customers` | fetch, create, update, delete | create: admin, sales |
+| `sales.orders` | fetch, create, update, delete, approve, reject | create: **any org member**; approve/reject/delete: admin; attach PO file: admin, sales, accountant |
+| `sales.proforma` | fetch, create | PDF routes open to authenticated org |
+| `sales.analytics` | fetch | cash-position: admin, accountant, sales |
+
+**Suggested member (sales dept):** customers fetch+create; orders fetch+create+update; no approve/delete unless promoted.
+
+### 5.3 Purchase
+
+| Resource | Actions | Today |
+|----------|---------|-------|
+| `purchase.suppliers` | fetch, create, update, delete | create/update: admin |
+| `purchase.orders` | fetch, create, update, delete, approve | create: admin, sales, store; PDF/seller-invoice: admin, sales, store, accountant |
+| `purchase.receipts` | fetch, create, update, approve | create/update: admin, accountant, store; approve: admin |
+| `purchase.invoices` | fetch, create, update | create: admin, accountant; record-payment: admin, accountant |
+| `purchase.settings` | fetch, settings | terms/addresses: read admin,sales,store; write admin, store |
+
+**Suggested member (store):** orders/receipts fetch+create; suppliers fetch only.
+
+**Suggested member (accountant):** full purchase invoices + payments; receipts fetch+create.
+
+### 5.4 Inventory
+
+| Resource | Actions | Today |
+|----------|---------|-------|
+| `inventory.items` | fetch, create, update, delete | create: admin, store; delete: admin |
+| `inventory.bom` | fetch, create, update, delete | create: admin |
+| `inventory.balances` | fetch | open to org members |
+| `inventory.scrap` | fetch, create, update | fetch open |
+| `inventory.stock_entries` | fetch, create, delete | from-material/sales-invoice/purchase/adjustment: admin, store; delete: admin |
+| `inventory.shortages` | fetch | admin, store, production, sales, accountant |
+| `inventory.material_issue_requests` | fetch, create, approve, reject | create: admin, production; deny/issue: admin, store |
+| `inventory.material_deposit_requests` | fetch, create, approve, reject | create: admin, production; approve/reject: admin, store |
+| `inventory.import` | import, export | import templates: all module roles; inventory import write: admin, store |
+
+**Suggested member (store):** all inventory fetch; stock_entries create; issue/deposit approve; items create; no BOM delete.
+
+**Suggested member (accountant):** balances + shortages fetch only (view-only inventory per FLOW.md).
+
+### 5.5 Manufacturing
+
+| Resource | Actions | Today |
+|----------|---------|-------|
+| `manufacturing.work_orders` | fetch, create, update, cancel | create: admin, production, sales; ready-to-ship: admin, production, sales; book-inventory/ship: admin, production, store; cancel: admin, production |
+| `manufacturing.material_entries` | fetch, create, approve | create: admin, production; approve: admin |
+| `manufacturing.production_lines` | fetch, create, update | shifts/logs: admin, production |
+| `manufacturing.planning` | fetch, create, update, delete | tasks: admin, production |
+| `manufacturing.analytics` | fetch | production-pipeline, inventory-health (role-gated) |
+
+**Suggested member (production):** work_orders fetch+create+ready-to-ship; material_entries create; material requests create; planning CRUD.
+
+### 5.6 Accounts (Finance)
+
+| Resource | Actions | Today |
+|----------|---------|-------|
+| `accounts.sales_invoices` | fetch, create, approve | create: admin, accountant; approve: admin |
+| `accounts.invoice_requests` | fetch, create, approve, reject | dispatch-sales-invoices + dispatch flow |
+| `accounts.purchase_invoices` | fetch, create, update | via `/purchase/invoices` |
+| `accounts.payment_entries` | fetch, create | admin, accountant |
+| `accounts.payments` | fetch, create | customer/supplier/general: admin, accountant |
+| `accounts.general_entries` | fetch, create | admin, accountant (general capped ₹50k in rules) |
+| `accounts.journal_entries` | fetch, create | admin, accountant |
+| `accounts.credit_notes` | fetch, create | admin, accountant |
+| `accounts.debit_notes` | fetch, create | admin, accountant |
+| `accounts.statement_of_account` | fetch, export | admin, accountant |
+| `accounts.payment_reminders` | fetch | admin, accountant |
+| `accounts.invoice_settings` | fetch, settings | admin, accountant |
+
+**Suggested member (accountant):** all accounts.* except approve (admin only unless granted).
+
+**Suggested member (non-finance):** no accounts.* except invoice_requests/dispatch reads if dispatch role needs them.
+
+### 5.7 Dispatch
+
+| Resource | Actions | Today |
+|----------|---------|-------|
+| `dispatch.orders` | fetch, create, approve, reject, dispatch | create: admin, sales, store; dispatch: admin, store; approve: admin |
+| `dispatch.sales_invoice_precheck` | fetch | admin, accountant |
+| `dispatch.sales_invoice_pdf` | fetch | admin, accountant |
+
+**Suggested member (store):** dispatch fetch+create+dispatch; sales invoice precheck fetch if paired with accountant workflow.
+
+### 5.8 HR / People
+
+| Resource | Actions | Today |
+|----------|---------|-------|
+| `hr.employees` | fetch, create, update, delete | list/detail: admin, accountant, production; mutate/delete/invite: admin |
+| `hr.employee_invite` | create | admin |
+| `hr.employee_revoke_login` | delete | admin |
+| `hr.deboard_requests` | fetch, create, approve, reject | request: admin, accountant, production; approve: admin |
+| `hr.edit_logs` | fetch | admin, accountant, production |
+| `hr.import` | import | admin |
+
+**Invited member:** typically **no** hr.* except own profile via `/me`.
+
+### 5.9 Data import / export
+
+| Resource | Actions | Today |
+|----------|---------|-------|
+| `data.templates` | fetch | admin, accountant, sales, store, production |
+| `data.export` | export | same |
+| `data.import` | import | per-entity; inventory import: admin, store |
+
+### 5.10 AI Assistant
+
+| Resource | Actions | Today |
+|----------|---------|-------|
+| `assistant.chat` | create | Tool access filtered by `TOOL_ROLE_MATRIX` in `assistant/catalog.ts` (read-only tools) |
+
+Mirror granular permissions to tool names in Phase 2.
+
+### 5.11 Settings & admin UI
+
+| Resource | Actions | Notes |
+|----------|---------|-------|
+| `settings.app` | fetch, settings | `/dashboard/settings` |
+| `admin.panel` | fetch, settings | `/dashboard/admin` — future permission management |
+
+---
+
+## 6. “Basic employee” default package (Phase 2 baseline)
+
+When `membership_role = member` and no custom overrides:
+
+1. Grant **one primary module role** from department (table in §2).
+2. For that role, enable **fetch** on all resources in the same business area (e.g. sales sees sales orders + customers).
+3. Enable **create/update** only on day-to-day operational resources listed in §5 “Suggested member” rows for that department.
+4. Deny by default: **approve**, **reject**, **delete** (masters), **settings**, **hr.*** , **organization.invite**, **platform.admin**.
+5. **Accountant** exception: full finance CRUD except approvals unless membership is admin/owner.
+
+Admin UI (Phase 3) toggles individual `resource.action` flags per user.
+
+---
+
+## 7. Gaps vs target (for Phase 2 implementation)
+
+| Gap | Detail |
+|-----|--------|
+| No `user_permissions` table | Only `organization_user_roles` + membership bypass |
+| SO create unrestricted | POST `/sales-orders` has no `requireRole` — any member can create |
+| Single module role per invite | `module_roles` array stored but only first role applied on accept |
+| Frontend not gated | Sidebar shows all modules; no permission-aware nav |
+| `public.users.role` | Legacy field; should not drive org authorization long-term |
+
+---
+
+## 8. Phase roadmap
+
+| Phase | Deliverable |
+|-------|-------------|
+| **1** ✅ | This document: modules, resources, actions, defaults, current API mapping |
+| **2** | DB schema + backend `requirePermission()` + seed defaults from §6 |
+| **3** | Admin UI to edit per-user permissions; hide nav/actions |
+| **4** | Invite flow: optional permission template; multi-role support |
+
+---
+
+## 9. Quick reference — module roles vs FLOW.md
+
+| FLOW.md role | `organization_user_roles` | Maps from legacy `requireRole('admin')` |
+|--------------|---------------------------|----------------------------------------|
+| admin | `erp_admin` (+ owner/admin membership) | yes |
+| accountant | `accountant` | |
+| store | `store` | |
+| production | `production` | |
+| sales | `sales` | |
+
+Membership `owner` or `admin` always passes `requireRole` regardless of module roles (`ERP-Backend/src/middleware/organization.ts`).
