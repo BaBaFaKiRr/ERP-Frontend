@@ -1,0 +1,12 @@
+The user that signs up for a new organisation is auto assigned as the admin. 
+That user can then invite users for his organisation from employees tab to create a login-id and password. 
+That means if a login credentials for a user does not exist, an admin can go to HR-> employees-> employee details page and there the
+"Invite to ERP" button is present before Edit button. 
+
+Now pressing this button shows a pop up with an invite link and a button to copy the link to clipboard. (one link is one time use and valid for 36 hours only)
+
+When the user shares this link with another user, and the other user opens it, he is taken to a webpage where we show fields username and password/confirm password.
+Once the user has completed email verification, we create a login id and password for this user to log into the organisation's ERP profile.
+
+Now when the employee's login credentials are created, and now the admin goes to this employee's employee details page, the "Invite to ERP" button is blurred and non-pressable
+Now we give admin button "revoke login" before "Invite to ERP" button. Pressing revoke login will delete that employee's login/user object from supabase

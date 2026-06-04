@@ -3,10 +3,20 @@
 import { type FormEvent, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { useParams } from 'next/navigation'
-import { ArrowLeft } from 'lucide-react'
+import { ArrowLeft, Copy, Check } from 'lucide-react'
 import { erpFetch } from '@/lib/erp-api'
+import { useOrganization } from '@/lib/organization-context'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
+import { Input } from '@/components/ui/input'
+import { cn } from '@/lib/utils'
 
 type Employee = {
   id: string
@@ -50,6 +60,14 @@ type Employee = {
     effective_date?: string | null
     created_at?: string | null
   }>
+  erp_access?: {
+    hasLogin: boolean
+    loginEmail: string | null
+    pendingInvitation: {
+      expiresAt: string
+      inviteUrl: string
+    } | null
+  }
 }
 
 function isImageUrl(url: string): boolean {
@@ -74,7 +92,12 @@ export default function EmployeeDetailsPage() {
   const [employee, setEmployee] = useState<Employee | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [meRole, setMeRole] = useState<string | null>(null)
+  const { membershipRole, moduleRoles, me } = useOrganization()
+  const [inviteOpen, setInviteOpen] = useState(false)
+  const [inviteUrl, setInviteUrl] = useState<string | null>(null)
+  const [inviteLoading, setInviteLoading] = useState(false)
+  const [revokeLoading, setRevokeLoading] = useState(false)
+  const [copied, setCopied] = useState(false)
   const [showDeboardForm, setShowDeboardForm] = useState(false)
   const [showRehireForm, setShowRehireForm] = useState(false)
   const [showEdit, setShowEdit] = useState(false)
@@ -121,7 +144,14 @@ export default function EmployeeDetailsPage() {
     bank_proof: null as File | null,
     account_holder_aadhar_card: null as File | null,
   })
-  const isAdmin = useMemo(() => meRole === 'admin', [meRole])
+  const isOrgAdmin = useMemo(() => {
+    if (membershipRole === 'owner' || membershipRole === 'admin') return true
+    if (moduleRoles.includes('erp_admin')) return true
+    return me?.user.role === 'admin'
+  }, [membershipRole, moduleRoles, me?.user.role])
+
+  const hasErpLogin = Boolean(employee?.erp_access?.hasLogin)
+  const canInvite = isOrgAdmin && employee && !hasErpLogin && employee.status !== 'deboarded'
 
   const salaryEditWarning = useMemo(() => {
     const ctc = Number(editForm.salary_ctc)
@@ -163,13 +193,12 @@ export default function EmployeeDetailsPage() {
       setLoading(true)
       setError(null)
       try {
-        const [res, meRes] = await Promise.all([
-          erpFetch<{ data: Employee }>(`/api/employees/by-code/${params.id}`),
-          erpFetch<{ user: { role: string } }>('/api/me'),
-        ])
+        const res = await erpFetch<{ data: Employee }>(`/api/employees/by-code/${params.id}`)
         setEmployee(res.data)
         resetEditForm(res.data)
-        setMeRole(meRes.user.role)
+        if (res.data.erp_access?.pendingInvitation?.inviteUrl) {
+          setInviteUrl(res.data.erp_access.pendingInvitation.inviteUrl)
+        }
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to load employee')
       } finally {
@@ -272,6 +301,51 @@ export default function EmployeeDetailsPage() {
     }
   }
 
+  const createInvite = async () => {
+    if (!employee) return
+    setInviteLoading(true)
+    setError(null)
+    try {
+      const res = await erpFetch<{ inviteUrl: string }>(`/api/employees/${employee.id}/invite`, {
+        method: 'POST',
+      })
+      setInviteUrl(res.inviteUrl)
+      setInviteOpen(true)
+      await reload()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to create invitation')
+    } finally {
+      setInviteLoading(false)
+    }
+  }
+
+  const copyInviteLink = async () => {
+    const link =
+      inviteUrl ?? employee?.erp_access?.pendingInvitation?.inviteUrl ?? null
+    if (!link) return
+    await navigator.clipboard.writeText(link)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
+  }
+
+  const revokeLogin = async () => {
+    if (!employee) return
+    if (!window.confirm('Revoke ERP login for this employee? They will no longer be able to sign in.')) {
+      return
+    }
+    setRevokeLoading(true)
+    setError(null)
+    try {
+      await erpFetch(`/api/employees/${employee.id}/revoke-login`, { method: 'POST' })
+      setInviteUrl(null)
+      await reload()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to revoke login')
+    } finally {
+      setRevokeLoading(false)
+    }
+  }
+
   const actOnRequest = async (requestId: string, action: 'approve' | 'reject') => {
     setError(null)
     try {
@@ -295,7 +369,35 @@ export default function EmployeeDetailsPage() {
         </Button>
         {!loading && employee ? (
           <div className="flex flex-wrap items-center gap-2">
-            {isAdmin ? (
+            {isOrgAdmin && hasErpLogin ? (
+              <Button
+                variant="outline"
+                disabled={revokeLoading}
+                onClick={() => void revokeLogin()}
+              >
+                {revokeLoading ? 'Revoking…' : 'Revoke login'}
+              </Button>
+            ) : null}
+            {isOrgAdmin ? (
+              <Button
+                variant="outline"
+                disabled={!canInvite || inviteLoading}
+                className={cn(!canInvite && 'pointer-events-none opacity-50')}
+                onClick={() => {
+                  if (!canInvite) return
+                  const existing = employee.erp_access?.pendingInvitation?.inviteUrl
+                  if (existing) {
+                    setInviteUrl(existing)
+                    setInviteOpen(true)
+                  } else {
+                    void createInvite()
+                  }
+                }}
+              >
+                {inviteLoading ? 'Generating…' : 'Invite to ERP'}
+              </Button>
+            ) : null}
+            {isOrgAdmin ? (
               <Button
                 variant="outline"
                 onClick={() => {
@@ -347,6 +449,37 @@ export default function EmployeeDetailsPage() {
 
       {loading ? <p className="text-gray-600">Loading employee...</p> : null}
       {error ? <p className="text-red-600">{error}</p> : null}
+
+      {hasErpLogin && employee?.erp_access?.loginEmail ? (
+        <p className="text-sm text-muted-foreground">
+          ERP login:{' '}
+          <span className="font-medium text-foreground">{employee.erp_access.loginEmail}</span>
+        </p>
+      ) : null}
+
+      <Dialog open={inviteOpen} onOpenChange={setInviteOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Invite to LEJER ERP</DialogTitle>
+            <DialogDescription>
+              Share this one-time link with {employee?.full_name ?? 'the employee'}. It expires in
+              36 hours.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="flex gap-2">
+              <Input readOnly value={inviteUrl ?? ''} className="font-mono text-xs" />
+              <Button type="button" variant="outline" size="icon" onClick={() => void copyInviteLink()}>
+                {copied ? <Check className="size-4" /> : <Copy className="size-4" />}
+              </Button>
+            </div>
+            <p className="text-muted-foreground text-xs">
+              The employee sets a password, verifies their email, then signs in to your organization
+              workspace.
+            </p>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {!loading && !error && employee ? (
         <Card>
@@ -851,7 +984,7 @@ export default function EmployeeDetailsPage() {
                     {request.reason_description ? (
                       <p className="text-sm text-muted-foreground">{request.reason_description}</p>
                     ) : null}
-                    {isAdmin && request.status === 'pending' ? (
+                    {isOrgAdmin && request.status === 'pending' ? (
                       <div className="mt-2 flex gap-2">
                         <Button size="sm" onClick={() => void actOnRequest(request.id, 'approve')}>
                           Approve
