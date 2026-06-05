@@ -123,7 +123,7 @@ export default function DispatchSalesOrderPage() {
         method: 'POST',
         body: JSON.stringify(payload),
       })
-      router.push('/dashboard/finance/invoice-requests')
+      router.push('/dashboard/dispatch/orders')
     } catch (e) {
       alert(e instanceof Error ? e.message : 'Failed to generate dispatch order')
     } finally {
@@ -134,8 +134,8 @@ export default function DispatchSalesOrderPage() {
   return (
     <div className="p-6 md:p-8 space-y-6">
       <Button asChild variant="ghost" className="pl-0">
-        <Link href="/dashboard/dispatch">
-          <ArrowLeft className="size-4 mr-2" /> Back to Dispatch
+        <Link href="/dashboard/dispatch/sales-orders">
+          <ArrowLeft className="size-4 mr-2" /> Back to Sales Orders
         </Link>
       </Button>
 

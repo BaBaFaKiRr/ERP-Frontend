@@ -28,8 +28,13 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
-import { ArrowLeft, ChevronDown, ChevronRight, FileText, Trash2 } from 'lucide-react'
+import { ArrowLeft, ChevronDown, ChevronRight, FileText, Trash2, Truck } from 'lucide-react'
 import { erpFetch } from '@/lib/erp-api'
+import {
+  canCreateDispatchOrder,
+  dispatchCreateHref,
+  isDispatchEligibleSalesOrder,
+} from '@/lib/dispatch-eligibility'
 import { cn } from '@/lib/utils'
 
 type LineRow = {
@@ -217,6 +222,8 @@ export default function SalesOrderDetailPage() {
   }, [])
 
   const isAdmin = me?.role === 'admin'
+  const showDispatchAction =
+    !!order && canCreateDispatchOrder(me?.role) && isDispatchEligibleSalesOrder(order.status)
 
   const handleApprove = async () => {
     if (!id || !order) return
@@ -586,12 +593,22 @@ export default function SalesOrderDetailPage() {
           <CardHeader>
             <div className="flex items-center justify-between gap-3 flex-wrap">
               <CardTitle>Sales order items</CardTitle>
-              <Button type="button" variant="outline" asChild>
-                <Link href={`/dashboard/manufacturing/work-orders/generate/${id}`}>Create work order</Link>
-              </Button>
+              <div className="flex flex-wrap items-center gap-2">
+                <Button type="button" variant="outline" asChild>
+                  <Link href={`/dashboard/manufacturing/work-orders/generate/${id}`}>Create work order</Link>
+                </Button>
+                {showDispatchAction ? (
+                  <Button type="button" variant="outline" asChild className="gap-2">
+                    <Link href={dispatchCreateHref(id)}>
+                      <Truck className="size-4" />
+                      Create dispatch order
+                    </Link>
+                  </Button>
+                ) : null}
+              </div>
             </div>
             <CardDescription>
-              Open Create work order to pick the line and review the exploded BOM before saving.
+              Create a work order from a line item, or generate a dispatch order when stock is ready to ship.
             </CardDescription>
           </CardHeader>
           <CardContent>

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import {
@@ -37,11 +37,25 @@ type LineDraft = {
 export default function CreateStockEntryPage() {
   const router = useRouter()
   const [submitting, setSubmitting] = useState(false)
-  const [storeName, setStoreName] = useState('')
+  const [createdBy, setCreatedBy] = useState('')
   const [notes, setNotes] = useState('')
   const [lines, setLines] = useState<LineDraft[]>([
     { item: null, quantity: '', direction: 'in' },
   ])
+
+  useEffect(() => {
+    void (async () => {
+      try {
+        const res = await erpFetch<{ user: { firstName: string | null; lastName: string | null; email: string } }>(
+          '/api/me',
+        )
+        const name = `${res.user.firstName ?? ''} ${res.user.lastName ?? ''}`.trim() || res.user.email
+        setCreatedBy(name)
+      } catch {
+        setCreatedBy('')
+      }
+    })()
+  }, [])
 
   const updateLine = (index: number, patch: Partial<LineDraft>) => {
     setLines((prev) => prev.map((row, i) => (i === index ? { ...row, ...patch } : row)))
@@ -57,10 +71,6 @@ export default function CreateStockEntryPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!storeName.trim()) {
-      alert('Enter store / operator name')
-      return
-    }
 
     const parsedLines: { item_id: string; quantity: number; direction: 'in' | 'out' }[] = []
     for (const row of lines) {
@@ -91,7 +101,6 @@ export default function CreateStockEntryPage() {
       await erpFetch('/api/stock-entries/adjustment', {
         method: 'POST',
         body: JSON.stringify({
-          store_employee_name: storeName.trim(),
           notes: notes.trim() || undefined,
           lines: parsedLines,
         }),
@@ -134,14 +143,8 @@ export default function CreateStockEntryPage() {
         <CardContent>
           <form onSubmit={(e) => void handleSubmit(e)} className="space-y-6">
             <div className="grid gap-2">
-              <Label htmlFor="store">Store / operator name</Label>
-              <Input
-                id="store"
-                value={storeName}
-                onChange={(e) => setStoreName(e.target.value)}
-                placeholder="Who is posting this entry"
-                required
-              />
+              <Label htmlFor="created-by">Created by</Label>
+              <Input id="created-by" value={createdBy || 'Loading…'} disabled readOnly />
             </div>
 
             <div className="grid gap-2">
@@ -220,7 +223,7 @@ export default function CreateStockEntryPage() {
             </div>
 
             <div className="flex gap-3 pt-2">
-              <Button type="submit" disabled={submitting}>
+              <Button type="submit" disabled={submitting || !createdBy}>
                 {submitting ? 'Posting…' : 'Post stock entry'}
               </Button>
               <Button type="button" variant="outline" asChild>

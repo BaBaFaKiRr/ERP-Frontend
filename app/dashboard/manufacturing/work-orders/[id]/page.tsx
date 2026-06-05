@@ -63,13 +63,8 @@ export default function WorkOrderDetailsPage() {
   const params = useParams()
   const id = typeof params.id === 'string' ? params.id : ''
   const [workOrder, setWorkOrder] = useState<WorkOrderDetail | null>(null)
-  const [inventoryByItem, setInventoryByItem] = useState<Record<string, number>>({})
-  const [qtyInputs, setQtyInputs] = useState<Record<string, string>>({})
   const [readyInputs, setReadyInputs] = useState<Record<string, string>>({})
-  const [bookingLineId, setBookingLineId] = useState<string | null>(null)
   const [readyLineId, setReadyLineId] = useState<string | null>(null)
-  const [shipInputs, setShipInputs] = useState<Record<string, string>>({})
-  const [shipLineId, setShipLineId] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [me, setMe] = useState<{ role: string } | null>(null)
@@ -95,15 +90,8 @@ export default function WorkOrderDetailsPage() {
     setLoading(true)
     setError(null)
     try {
-      const [woRes, invRes] = await Promise.all([
-        erpFetch<{ data: WorkOrderDetail }>(`/api/work-orders/${id}`),
-        erpFetch<{ data: Array<{ item_id: string; qty_on_hand: number }> }>('/api/inventory/balances'),
-      ])
-      const wo = woRes.data ?? null
-      setWorkOrder(wo)
-      const byItem: Record<string, number> = {}
-      for (const row of invRes.data ?? []) byItem[row.item_id] = Number(row.qty_on_hand ?? 0)
-      setInventoryByItem(byItem)
+      const woRes = await erpFetch<{ data: WorkOrderDetail }>(`/api/work-orders/${id}`)
+      setWorkOrder(woRes.data ?? null)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to load work order')
     } finally {
@@ -113,31 +101,6 @@ export default function WorkOrderDetailsPage() {
 
   const canReadyToShip = ['admin', 'production', 'sales'].includes(me?.role ?? '')
   const canCancelWo = ['admin', 'production'].includes(me?.role ?? '')
-
-  const bookInventory = async (line: WorkOrderLine) => {
-    const value = Number(qtyInputs[line.id] ?? 0)
-    if (!Number.isFinite(value) || value <= 0) {
-      alert('Enter a valid quantity to book.')
-      return
-    }
-
-    setBookingLineId(line.id)
-    try {
-      await erpFetch(`/api/work-orders/${id}/book-inventory`, {
-        method: 'POST',
-        body: JSON.stringify({
-          line_id: line.id,
-          quantity: value,
-        }),
-      })
-      setQtyInputs((prev) => ({ ...prev, [line.id]: '' }))
-      await load()
-    } catch (e) {
-      alert(e instanceof Error ? e.message : 'Failed to book inventory')
-    } finally {
-      setBookingLineId(null)
-    }
-  }
 
   const addReadyToShip = async (line: WorkOrderLine) => {
     const value = Number(readyInputs[line.id] ?? 0)
@@ -157,27 +120,6 @@ export default function WorkOrderDetailsPage() {
       alert(e instanceof Error ? e.message : 'Failed to update ready-to-ship')
     } finally {
       setReadyLineId(null)
-    }
-  }
-
-  const shipFromBooked = async (line: WorkOrderLine) => {
-    const value = Number(shipInputs[line.id] ?? 0)
-    if (!Number.isFinite(value) || value <= 0) {
-      alert('Enter a valid quantity to ship.')
-      return
-    }
-    setShipLineId(line.id)
-    try {
-      await erpFetch(`/api/work-orders/${id}/ship`, {
-        method: 'POST',
-        body: JSON.stringify({ line_id: line.id, quantity: value }),
-      })
-      setShipInputs((prev) => ({ ...prev, [line.id]: '' }))
-      await load()
-    } catch (e) {
-      alert(e instanceof Error ? e.message : 'Failed to ship')
-    } finally {
-      setShipLineId(null)
     }
   }
 
@@ -338,10 +280,8 @@ export default function WorkOrderDetailsPage() {
 
         <Card>
           <CardHeader>
-            <CardTitle>Line booking, ship from booked</CardTitle>
-            <CardDescription>
-              Book moves on-hand FG into this WO line; ship posts shipped qty from booked quantity.
-            </CardDescription>
+            <CardTitle>Work order lines</CardTitle>
+            <CardDescription>Quantities tracked per output line on this work order.</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="overflow-x-auto">
@@ -351,20 +291,15 @@ export default function WorkOrderDetailsPage() {
                     <TableHead>SKU</TableHead>
                     <TableHead>Item</TableHead>
                     <TableHead className="text-right">Qty ordered</TableHead>
-                    <TableHead className="text-right">Booked</TableHead>
-                    <TableHead className="text-right">On hand</TableHead>
-                    <TableHead className="min-w-[100px]">Qty to book</TableHead>
-                    <TableHead>Book</TableHead>
-                    <TableHead className="text-right">Shipped</TableHead>
-                    <TableHead className="text-right">Ready</TableHead>
-                    <TableHead className="min-w-[100px]">Qty to ship</TableHead>
-                    <TableHead>Ship</TableHead>
+                    <TableHead className="text-right">Qty produced</TableHead>
+                    <TableHead className="text-right">Qty shipped</TableHead>
+                    <TableHead className="text-right">Ready to ship</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {lines.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={11}>No lines.</TableCell>
+                      <TableCell colSpan={6}>No lines.</TableCell>
                     </TableRow>
                   ) : (
                     lines.map((line) => (
@@ -373,51 +308,8 @@ export default function WorkOrderDetailsPage() {
                         <TableCell>{line.items?.name ?? '—'}</TableCell>
                         <TableCell className="text-right">{Number(line.qty_ordered ?? 0)}</TableCell>
                         <TableCell className="text-right">{Number(line.qty_produced ?? 0)}</TableCell>
-                        <TableCell className="text-right">{Number(inventoryByItem[line.item_id] ?? 0)}</TableCell>
-                        <TableCell>
-                          <Input
-                            type="number"
-                            min={0}
-                            value={qtyInputs[line.id] ?? ''}
-                            onChange={(e) =>
-                              setQtyInputs((prev) => ({ ...prev, [line.id]: e.target.value }))
-                            }
-                            placeholder="0"
-                          />
-                        </TableCell>
-                        <TableCell>
-                          <Button
-                            type="button"
-                            size="sm"
-                            disabled={bookingLineId === line.id}
-                            onClick={() => void bookInventory(line)}
-                          >
-                            {bookingLineId === line.id ? '…' : 'Book'}
-                          </Button>
-                        </TableCell>
                         <TableCell className="text-right">{Number(line.qty_shipped ?? 0)}</TableCell>
                         <TableCell className="text-right">{Number(line.qty_ready_to_ship ?? 0)}</TableCell>
-                        <TableCell>
-                          <Input
-                            type="number"
-                            min={0}
-                            value={shipInputs[line.id] ?? ''}
-                            onChange={(e) =>
-                              setShipInputs((prev) => ({ ...prev, [line.id]: e.target.value }))
-                            }
-                            placeholder="0"
-                          />
-                        </TableCell>
-                        <TableCell>
-                          <Button
-                            type="button"
-                            size="sm"
-                            disabled={shipLineId === line.id}
-                            onClick={() => void shipFromBooked(line)}
-                          >
-                            {shipLineId === line.id ? '…' : 'Ship'}
-                          </Button>
-                        </TableCell>
                       </TableRow>
                     ))
                   )}

@@ -73,6 +73,11 @@ export const HR_CHILDREN: NavChild[] = [
   { name: 'Employees', href: '/dashboard/hr/employees' },
 ]
 
+export const DISPATCH_CHILDREN: NavChild[] = [
+  { name: 'Dispatch Orders', href: '/dashboard/dispatch/orders' },
+  { name: 'Sales Orders', href: '/dashboard/dispatch/sales-orders' },
+]
+
 function prefixActive(pathname: string, href: string, exact = false) {
   if (exact) return pathname === href
   return pathname === href || pathname.startsWith(`${href}/`)
@@ -91,6 +96,15 @@ export function childActive(pathname: string, href: string, sectionPrefix: strin
   }
   if (href === '/dashboard/inventory') {
     return pathname === '/dashboard/inventory'
+  }
+  if (href === '/dashboard/dispatch/orders') {
+    return pathname === '/dashboard/dispatch' || prefixActive(pathname, href)
+  }
+  if (href === '/dashboard/dispatch/sales-orders') {
+    if (prefixActive(pathname, href)) return true
+    const rest = pathname.slice('/dashboard/dispatch/'.length)
+    if (rest && !rest.includes('/') && rest !== 'orders') return true
+    return false
   }
   return prefixActive(pathname, href)
 }
@@ -151,9 +165,10 @@ export const MAIN_NAV: NavItem[] = [
   },
   {
     name: 'Dispatch',
-    href: '/dashboard/dispatch',
     icon: Truck,
-    match: (p) => p.startsWith('/dashboard/dispatch'),
+    sectionPrefix: '/dashboard/dispatch',
+    children: DISPATCH_CHILDREN,
+    match: (p) => sectionActive(p, '/dashboard/dispatch', DISPATCH_CHILDREN),
   },
   {
     name: 'Settings',
