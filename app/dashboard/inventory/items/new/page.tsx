@@ -22,47 +22,26 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { ArrowLeft, PackagePlus } from 'lucide-react'
+import { ArrowLeft, PackagePlus, Settings2 } from 'lucide-react'
 import { FgCategorySearch } from '@/components/inventory/fg-category-search'
 import { erpFetch } from '@/lib/erp-api'
 
-const UOM_OPTIONS: { value: string; label: string }[] = [
-  { value: 'pcs', label: 'pcs' },
-  { value: 'kg', label: 'kg' },
-  { value: 'g', label: 'g' },
-  { value: 'ton', label: 'ton' },
-  { value: 'm', label: 'm' },
-  { value: 'cm', label: 'cm' },
-  { value: 'l', label: 'l' },
-  { value: 'ml', label: 'ml' },
-  { value: 'sqm', label: 'sqm' },
-  { value: 'box', label: 'box' },
-  { value: 'dozen', label: 'dozen' },
-  { value: 'pair', label: 'pair' },
-  { value: 'set', label: 'set' },
-  { value: 'bundle', label: 'bundle' },
-  { value: 'roll', label: 'roll' },
-  { value: 'sheet', label: 'sheet' },
-]
-
-const ITEM_TYPES: { value: string; label: string }[] = [
-  { value: 'finished_good', label: 'Finished good' },
-  { value: 'semi_finished', label: 'Semi-finished' },
-  { value: 'raw_material', label: 'Raw material' },
-  { value: 'packaging', label: 'Packaging' },
-  { value: 'service', label: 'Service' },
-]
+type ItemTypeOption = { code: string; name: string }
+type UomOption = { code: string; name: string }
 
 export default function CreateItemPage() {
   const router = useRouter()
   const [loading, setLoading] = useState(false)
+  const [mastersLoading, setMastersLoading] = useState(true)
+  const [itemTypes, setItemTypes] = useState<ItemTypeOption[]>([])
+  const [uomOptions, setUomOptions] = useState<UomOption[]>([])
   const [sku, setSku] = useState('')
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
-  const [itemType, setItemType] = useState('finished_good')
-  const [uom, setUom] = useState('pcs')
+  const [itemType, setItemType] = useState('')
+  const [uom, setUom] = useState('')
   const [standardCost, setStandardCost] = useState('')
-  const [standardCostUom, setStandardCostUom] = useState('kg')
+  const [standardCostUom, setStandardCostUom] = useState('')
   const [hsn, setHsn] = useState('')
   const [costPerUnit, setCostPerUnit] = useState('')
   const [pricePerUnit, setPricePerUnit] = useState('')
@@ -73,6 +52,43 @@ export default function CreateItemPage() {
   const [fgCategory, setFgCategory] = useState<string | null>(null)
 
   const isFinishedGood = itemType === 'finished_good'
+
+  useEffect(() => {
+    let cancelled = false
+    void (async () => {
+      setMastersLoading(true)
+      try {
+        const [typesRes, uomRes] = await Promise.all([
+          erpFetch<{ data: ItemTypeOption[] }>('/api/item-masters/item-types'),
+          erpFetch<{ data: UomOption[] }>('/api/item-masters/units-of-measure'),
+        ])
+        if (cancelled) return
+        const types = typesRes.data ?? []
+        const uoms = uomRes.data ?? []
+        setItemTypes(types)
+        setUomOptions(uoms)
+        if (types.length > 0) {
+          const fg = types.find((t) => t.code === 'finished_good') ?? types[0]
+          setItemType((prev) => prev || fg.code)
+        }
+        if (uoms.length > 0) {
+          const pcs = uoms.find((u) => u.code === 'pcs') ?? uoms[0]
+          setUom((prev) => prev || pcs.code)
+          setStandardCostUom((prev) => prev || pcs.code)
+        }
+      } catch {
+        if (!cancelled) {
+          setItemTypes([])
+          setUomOptions([])
+        }
+      } finally {
+        if (!cancelled) setMastersLoading(false)
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   useEffect(() => {
     if (itemType === 'service') {
@@ -91,6 +107,10 @@ export default function CreateItemPage() {
       alert('SKU and name are required')
       return
     }
+    if (!itemType || !uom) {
+      alert('Item type and unit of measure are required')
+      return
+    }
 
     const body: Record<string, unknown> = {
       sku: sku.trim(),
@@ -105,13 +125,15 @@ export default function CreateItemPage() {
       body.description = description.trim()
     }
 
+    if (!hsn.trim()) {
+      alert('HSN is required')
+      return
+    }
+    body.hsn = hsn.trim()
+
     if (isFinishedGood) {
       if (!fgCategory) {
         alert('Search and select a category from the list')
-        return
-      }
-      if (!hsn.trim()) {
-        alert('HSN is required for finished goods')
         return
       }
       const cpu = Number(costPerUnit)
@@ -130,7 +152,6 @@ export default function CreateItemPage() {
         return
       }
       body.fg_category = fgCategory
-      body.hsn = hsn.trim()
       body.cost_per_unit = cpu
       body.price_per_unit = ppu
       body.mrp = mrpN
@@ -143,7 +164,7 @@ export default function CreateItemPage() {
           return
         }
         body.standard_cost = cost
-        body.standard_cost_uom = standardCostUom
+        body.standard_cost_uom = standardCostUom || uom
       }
     }
 
@@ -166,7 +187,7 @@ export default function CreateItemPage() {
   }
 
   return (
-    <div className="p-8 max-w-2xl">
+    <div className="p-6 lg:p-8">
       <div className="flex items-center gap-4 mb-8">
         <Button variant="ghost" size="icon" asChild>
           <Link href="/dashboard/inventory/items" aria-label="Back to items">
@@ -174,108 +195,136 @@ export default function CreateItemPage() {
           </Link>
         </Button>
         <div>
-          <h1 className="text-4xl font-bold text-gray-900 dark:text-white">Create item</h1>
-          <p className="text-gray-600 mt-2">Master data for stock, sales, and manufacturing.</p>
+          <h1 className="text-3xl lg:text-4xl font-bold text-gray-900 dark:text-white">Create item</h1>
+          <p className="text-muted-foreground mt-1">Master data for stock, sales, and manufacturing.</p>
         </div>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <PackagePlus size={22} />
-            Item details
-          </CardTitle>
-          <CardDescription>
-            {isFinishedGood
-              ? 'Finished goods require HSN and INR amounts per your stock unit of measure (below).'
-              : 'Standard cost is in INR per the unit you choose (e.g. 100 INR per kg).'}
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={(e) => void handleSubmit(e)} className="space-y-6">
-            <div className="grid gap-2">
-              <Label htmlFor="sku">SKU</Label>
-              <Input
-                id="sku"
-                value={sku}
-                onChange={(e) => setSku(e.target.value)}
-                placeholder="e.g. J300-043"
-                className="font-mono"
-                required
-              />
-            </div>
+      <form onSubmit={(e) => void handleSubmit(e)} className="grid grid-cols-1 xl:grid-cols-12 gap-6">
+        <div className="xl:col-span-8 space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Basic information</CardTitle>
+              <CardDescription>Identity and description for this item.</CardDescription>
+            </CardHeader>
+            <CardContent className="grid sm:grid-cols-2 gap-4">
+              <div className="grid gap-2">
+                <Label htmlFor="sku">SKU</Label>
+                <Input
+                  id="sku"
+                  value={sku}
+                  onChange={(e) => setSku(e.target.value)}
+                  placeholder="e.g. J300-043"
+                  className="font-mono"
+                  required
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="name">Name</Label>
+                <Input
+                  id="name"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder="Display name"
+                  required
+                />
+              </div>
+              <div className="grid gap-2 sm:col-span-2">
+                <Label htmlFor="description">Description (optional)</Label>
+                <Textarea
+                  id="description"
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  rows={3}
+                  className="resize-y min-h-[80px]"
+                />
+              </div>
+            </CardContent>
+          </Card>
 
-            <div className="grid gap-2">
-              <Label htmlFor="name">Name</Label>
-              <Input
-                id="name"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="Display name"
-                required
-              />
-            </div>
-
-            <div className="grid gap-2">
-              <Label htmlFor="description">Description (optional)</Label>
-              <Textarea
-                id="description"
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                rows={3}
-              />
-            </div>
-
-            <div className="grid gap-2">
-              <Label>Item type</Label>
-              <Select value={itemType} onValueChange={setItemType}>
-                <SelectTrigger className="w-full max-w-md">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {ITEM_TYPES.map((t) => (
-                    <SelectItem key={t.value} value={t.value}>
-                      {t.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="grid gap-2">
-              <Label>Unit of measure (stock)</Label>
-              <Select value={uom} onValueChange={setUom}>
-                <SelectTrigger className="w-full max-w-xs">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {UOM_OPTIONS.map((u) => (
-                    <SelectItem key={u.value} value={u.value}>
-                      {u.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <p className="text-xs text-muted-foreground">
-                Cost, price, and MRP for finished goods are all per this unit.
-              </p>
-            </div>
-
-            {isFinishedGood ? (
-              <div className="rounded-lg border bg-muted/30 p-4 space-y-4">
-                <p className="text-sm font-medium">Finished good — category, HSN &amp; pricing (INR)</p>
-                <FgCategorySearch value={fgCategory} onChange={setFgCategory} />
-                <div className="grid gap-2">
-                  <Label htmlFor="hsn">HSN</Label>
-                  <Input
-                    id="hsn"
-                    value={hsn}
-                    onChange={(e) => setHsn(e.target.value)}
-                    placeholder="e.g. 8539"
-                    className="font-mono max-w-xs"
-                    required={isFinishedGood}
-                  />
+          <Card>
+            <CardHeader>
+              <CardTitle>Classification</CardTitle>
+              <CardDescription>Type, unit of measure, and tax code.</CardDescription>
+            </CardHeader>
+            <CardContent className="grid sm:grid-cols-2 gap-4">
+              <div className="grid gap-2">
+                <div className="flex items-center justify-between gap-2">
+                  <Label>Item type</Label>
+                  <Button type="button" variant="ghost" size="sm" className="h-7 px-2 text-xs" asChild>
+                    <Link href="/dashboard/inventory/settings/item-types">
+                      <Settings2 className="size-3.5 mr-1" />
+                      Configure
+                    </Link>
+                  </Button>
                 </div>
+                <Select value={itemType} onValueChange={setItemType} disabled={mastersLoading || itemTypes.length === 0}>
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder={mastersLoading ? 'Loading…' : 'Select item type'} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {itemTypes.map((t) => (
+                      <SelectItem key={t.code} value={t.code}>
+                        {t.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="grid gap-2">
+                <div className="flex items-center justify-between gap-2">
+                  <Label>Unit of measure (stock)</Label>
+                  <Button type="button" variant="ghost" size="sm" className="h-7 px-2 text-xs" asChild>
+                    <Link href="/dashboard/inventory/settings/units-of-measure">
+                      <Settings2 className="size-3.5 mr-1" />
+                      Configure
+                    </Link>
+                  </Button>
+                </div>
+                <Select value={uom} onValueChange={setUom} disabled={mastersLoading || uomOptions.length === 0}>
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder={mastersLoading ? 'Loading…' : 'Select unit'} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {uomOptions.map((u) => (
+                      <SelectItem key={u.code} value={u.code}>
+                        {u.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {isFinishedGood ? (
+                  <p className="text-xs text-muted-foreground">
+                    Cost, price, and MRP are per this unit.
+                  </p>
+                ) : null}
+              </div>
+
+              <div className="grid gap-2 sm:col-span-2 sm:max-w-xs">
+                <Label htmlFor="hsn">HSN</Label>
+                <Input
+                  id="hsn"
+                  value={hsn}
+                  onChange={(e) => setHsn(e.target.value)}
+                  placeholder="e.g. 8539"
+                  className="font-mono"
+                  required
+                />
+              </div>
+            </CardContent>
+          </Card>
+
+          {isFinishedGood ? (
+            <Card>
+              <CardHeader>
+                <CardTitle>Finished good pricing</CardTitle>
+                <CardDescription>
+                  Category and INR amounts per stock unit of measure.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <FgCategorySearch value={fgCategory} onChange={setFgCategory} />
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                   <div className="grid gap-2">
                     <Label htmlFor="cpu">Cost per unit</Label>
@@ -314,17 +363,20 @@ export default function CreateItemPage() {
                     />
                   </div>
                 </div>
-              </div>
-            ) : (
-              <div className="grid gap-2">
-                <Label>Standard cost (optional)</Label>
-                <p className="text-sm text-muted-foreground">
-                  Valuation: amount in INR for one unit of measure below.
-                </p>
-                <div className="flex flex-wrap items-end gap-2">
-                  <div className="space-y-1">
-                    <span className="text-xs text-muted-foreground">INR</span>
+              </CardContent>
+            </Card>
+          ) : (
+            <Card>
+              <CardHeader>
+                <CardTitle>Standard cost</CardTitle>
+                <CardDescription>Optional valuation in INR per unit.</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="grid sm:grid-cols-[1fr_auto_1fr] gap-3 items-end max-w-lg">
+                  <div className="grid gap-2">
+                    <Label htmlFor="standard-cost">Amount (INR)</Label>
                     <Input
+                      id="standard-cost"
                       type="number"
                       inputMode="decimal"
                       min={0}
@@ -332,30 +384,40 @@ export default function CreateItemPage() {
                       value={standardCost}
                       onChange={(e) => setStandardCost(e.target.value)}
                       placeholder="e.g. 100"
-                      className="w-36"
                     />
                   </div>
-                  <span className="pb-2 text-sm text-muted-foreground">per</span>
-                  <div className="space-y-1">
-                    <span className="text-xs text-muted-foreground">Unit</span>
+                  <span className="pb-2 text-sm text-muted-foreground hidden sm:block">per</span>
+                  <div className="grid gap-2">
+                    <Label>Unit</Label>
                     <Select value={standardCostUom} onValueChange={setStandardCostUom}>
-                      <SelectTrigger className="w-[140px]">
+                      <SelectTrigger className="w-full">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        {UOM_OPTIONS.map((u) => (
-                          <SelectItem key={u.value} value={u.value}>
-                            {u.label}
+                        {uomOptions.map((u) => (
+                          <SelectItem key={u.code} value={u.code}>
+                            {u.name}
                           </SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
                   </div>
                 </div>
-              </div>
-            )}
+              </CardContent>
+            </Card>
+          )}
+        </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="xl:col-span-4 space-y-6">
+          <Card className="xl:sticky xl:top-6">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <PackagePlus size={20} />
+                Inventory settings
+              </CardTitle>
+              <CardDescription>Stock tracking and replenishment thresholds.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
               <div className="grid gap-2">
                 <Label htmlFor="reserve">Reserve quantity</Label>
                 <Input
@@ -378,31 +440,36 @@ export default function CreateItemPage() {
                   onChange={(e) => setReorderLevel(e.target.value)}
                 />
               </div>
-            </div>
+              <div className="flex items-start gap-3 rounded-lg border bg-muted/30 p-3">
+                <Checkbox
+                  id="track"
+                  checked={trackInventory}
+                  onCheckedChange={(c) => setTrackInventory(c === true)}
+                  disabled={itemType === 'service'}
+                  className="mt-0.5"
+                />
+                <div className="space-y-0.5">
+                  <Label htmlFor="track" className="font-normal cursor-pointer leading-snug">
+                    Track inventory
+                  </Label>
+                  <p className="text-xs text-muted-foreground">
+                    Record stock movements for this item.
+                  </p>
+                </div>
+              </div>
 
-            <div className="flex items-center gap-2">
-              <Checkbox
-                id="track"
-                checked={trackInventory}
-                onCheckedChange={(c) => setTrackInventory(c === true)}
-                disabled={itemType === 'service'}
-              />
-              <Label htmlFor="track" className="font-normal cursor-pointer">
-                Track inventory (stock movements)
-              </Label>
-            </div>
-
-            <div className="flex gap-3 pt-2">
-              <Button type="submit" disabled={loading}>
-                {loading ? 'Creating…' : 'Create item'}
-              </Button>
-              <Button type="button" variant="outline" asChild>
-                <Link href="/dashboard/inventory/items">Cancel</Link>
-              </Button>
-            </div>
-          </form>
-        </CardContent>
-      </Card>
+              <div className="flex flex-col gap-2 pt-2 border-t">
+                <Button type="submit" disabled={loading || mastersLoading} className="w-full">
+                  {loading ? 'Creating…' : 'Create item'}
+                </Button>
+                <Button type="button" variant="outline" asChild className="w-full">
+                  <Link href="/dashboard/inventory/items">Cancel</Link>
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </form>
     </div>
   )
 }

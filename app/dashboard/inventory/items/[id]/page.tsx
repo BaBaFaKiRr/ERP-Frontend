@@ -205,6 +205,10 @@ export default function ItemDetailPage() {
               <p className="font-medium">{item.uom}</p>
             </div>
             <div>
+              <p className="text-muted-foreground">HSN</p>
+              <p className="font-mono font-medium">{item.hsn?.trim() || '—'}</p>
+            </div>
+            <div>
               <p className="text-muted-foreground">Track inventory</p>
               <p className="font-medium">{item.track_inventory ? 'Yes' : 'No'}</p>
             </div>
@@ -232,16 +236,12 @@ export default function ItemDetailPage() {
         {isFg ? (
           <Card>
             <CardHeader>
-              <CardTitle>HSN &amp; pricing (INR per {item.uom})</CardTitle>
+              <CardTitle>Category &amp; pricing (INR per {item.uom})</CardTitle>
             </CardHeader>
             <CardContent className="grid sm:grid-cols-2 gap-4 text-sm">
               <div>
                 <p className="text-muted-foreground">Category</p>
                 <p className="font-medium">{item.fg_category?.trim() || '—'}</p>
-              </div>
-              <div>
-                <p className="text-muted-foreground">HSN</p>
-                <p className="font-mono font-medium">{item.hsn?.trim() || '—'}</p>
               </div>
               <div>
                 <p className="text-muted-foreground">Cost per unit</p>
