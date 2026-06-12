@@ -9,8 +9,15 @@ RUN npm ci
 # Copy codebase
 COPY . .
 
-# Build Next.js application
+# Build arguments for Supabase URLs and Keys (with fallback demo defaults to ensure out-of-the-box build success)
+ARG NEXT_PUBLIC_SUPABASE_URL=https://hixcjhqmoxqrbzsqujic.supabase.co
+ARG NEXT_PUBLIC_SUPABASE_ANON_KEY=sb_publishable_yVV9N1F-kfk_8CJ4okf9bQ_5glF6jW4
+
+ENV NEXT_PUBLIC_SUPABASE_URL=$NEXT_PUBLIC_SUPABASE_URL
+ENV NEXT_PUBLIC_SUPABASE_ANON_KEY=$NEXT_PUBLIC_SUPABASE_ANON_KEY
 ENV NEXT_TELEMETRY_DISABLED=1
+
+# Build Next.js application
 RUN npm run build
 
 # --- Production Runner Stage ---
