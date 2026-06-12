@@ -1,53 +1,63 @@
 -- Manufacturing ERP Database Schema
--- This file creates all necessary tables for the Hedgeone ERP system
--- Execute this in Supabase SQL Editor
+-- This file creates all necessary base tables for the Hedgeone ERP system
+-- Execute this to initialize the database before migrations
 
--- Enable UUID extension
-CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
-CREATE EXTENSION IF NOT EXISTS "pgcrypto";
+-- Drop and recreate public schema for a clean, idempotent run
+DROP SCHEMA IF EXISTS public CASCADE;
+CREATE SCHEMA public;
+
+-- Grant privileges on public schema
+GRANT ALL ON SCHEMA public TO postgres;
+GRANT ALL ON SCHEMA public TO public;
+GRANT ALL ON SCHEMA public TO anon;
+GRANT ALL ON SCHEMA public TO authenticated;
+GRANT ALL ON SCHEMA public TO service_role;
+
+-- Alter default privileges for future objects in public schema
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO postgres, anon, authenticated, service_role;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON FUNCTIONS TO postgres, anon, authenticated, service_role;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO postgres, anon, authenticated, service_role;
+
+-- Enable extensions in public schema
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp" SCHEMA public;
+CREATE EXTENSION IF NOT EXISTS "pgcrypto" SCHEMA public;
 
 -- Drop existing types if they exist (for idempotency)
-DROP TYPE IF EXISTS user_role CASCADE;
-DROP TYPE IF EXISTS sale_order_status CASCADE;
-DROP TYPE IF EXISTS purchase_order_status CASCADE;
-DROP TYPE IF EXISTS work_order_status CASCADE;
-DROP TYPE IF EXISTS material_entry_status CASCADE;
-DROP TYPE IF EXISTS invoice_status CASCADE;
-DROP TYPE IF EXISTS payment_status CASCADE;
+DROP TYPE IF EXISTS public.user_role CASCADE;
+DROP TYPE IF EXISTS public.payment_target CASCADE;
+DROP TYPE IF EXISTS public.stock_entry_purpose CASCADE;
 
 -- Create enum types
-CREATE TYPE user_role AS ENUM ('admin', 'manager', 'supervisor', 'sales_person', 'employee');
-CREATE TYPE sale_order_status AS ENUM ('draft', 'pending_approval', 'approved', 'partially_delivered', 'completed', 'cancelled');
-CREATE TYPE purchase_order_status AS ENUM ('draft', 'pending_approval', 'approved', 'partially_received', 'completed', 'cancelled');
-CREATE TYPE work_order_status AS ENUM ('pending', 'in_progress', 'paused', 'completed', 'cancelled');
-CREATE TYPE material_entry_status AS ENUM ('pending', 'approved', 'rejected');
-CREATE TYPE invoice_status AS ENUM ('draft', 'issued', 'partially_paid', 'paid', 'overdue', 'cancelled');
-CREATE TYPE payment_status AS ENUM ('pending', 'partial', 'completed', 'overdue');
+CREATE TYPE public.user_role AS ENUM ('admin', 'accountant', 'store', 'production', 'sales', 'manager', 'supervisor', 'sales_person', 'employee');
+CREATE TYPE public.payment_target AS ENUM ('sales_invoice', 'purchase_receipt', 'general_entry', 'purchase_invoice', 'payment_entry');
+CREATE TYPE public.stock_entry_purpose AS ENUM ('issue_raw_material', 'receipt_fg', 'dispatch_sales', 'receipt_purchase', 'adjustment', 'debit_note_return', 'credit_note_return');
 
 -- Users table (links to Supabase auth.users)
-CREATE TABLE IF NOT EXISTS users (
+CREATE TABLE IF NOT EXISTS public.users (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   auth_id UUID UNIQUE NOT NULL,
   email TEXT UNIQUE NOT NULL,
   first_name TEXT,
   last_name TEXT,
   phone TEXT,
-  role user_role DEFAULT 'employee',
+  role public.user_role DEFAULT 'employee',
   department TEXT,
   is_active BOOLEAN DEFAULT true,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
-CREATE INDEX IF NOT EXISTS idx_users_auth_id ON users(auth_id);
-CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
+CREATE INDEX IF NOT EXISTS idx_users_auth_id ON public.users(auth_id);
+CREATE INDEX IF NOT EXISTS idx_users_email ON public.users(email);
 
 -- Customers table
-CREATE TABLE IF NOT EXISTS customers (
+CREATE TABLE IF NOT EXISTS public.customers (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   name TEXT NOT NULL,
   email TEXT,
   phone TEXT,
+  customer_type TEXT,
+  ecommerce_platform TEXT,
   billing_address TEXT,
   shipping_address TEXT,
   city TEXT,
@@ -58,12 +68,13 @@ CREATE TABLE IF NOT EXISTS customers (
   credit_limit DECIMAL(15, 2),
   payment_terms TEXT,
   is_active BOOLEAN DEFAULT true,
+  gst_number TEXT,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
 -- Suppliers table
-CREATE TABLE IF NOT EXISTS suppliers (
+CREATE TABLE IF NOT EXISTS public.suppliers (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   name TEXT NOT NULL,
   email TEXT,
@@ -80,298 +91,400 @@ CREATE TABLE IF NOT EXISTS suppliers (
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- Products table
-CREATE TABLE IF NOT EXISTS products (
+-- Items table (SKU catalog - replaces products)
+CREATE TABLE IF NOT EXISTS public.items (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  code TEXT UNIQUE NOT NULL,
+  sku TEXT NOT NULL,
   name TEXT NOT NULL,
   description TEXT,
-  category TEXT,
-  unit_price DECIMAL(15, 2),
-  reorder_level INT DEFAULT 10,
+  item_type TEXT NOT NULL,
+  uom TEXT NOT NULL DEFAULT 'pcs',
+  reserve_quantity INTEGER DEFAULT 0,
+  reorder_level INTEGER DEFAULT 0,
+  track_inventory BOOLEAN DEFAULT true,
+  standard_cost DECIMAL(15, 2),
+  standard_cost_uom TEXT DEFAULT 'pcs',
+  hsn TEXT,
+  cost_per_unit DECIMAL(15, 2),
+  price_per_unit DECIMAL(15, 2),
+  mrp DECIMAL(15, 2),
   is_active BOOLEAN DEFAULT true,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  CONSTRAINT items_sku_key UNIQUE (sku)
+);
+
+-- Inventory Balances table (replaces inventory)
+CREATE TABLE IF NOT EXISTS public.inventory_balances (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  item_id UUID UNIQUE NOT NULL REFERENCES public.items(id) ON DELETE CASCADE,
+  qty_on_hand NUMERIC(14, 3) NOT NULL DEFAULT 0 CHECK (qty_on_hand >= 0),
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- Inventory table
-CREATE TABLE IF NOT EXISTS inventory (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  product_id UUID NOT NULL REFERENCES products(id) ON DELETE CASCADE,
-  quantity_on_hand INT DEFAULT 0,
-  quantity_reserved INT DEFAULT 0,
-  reorder_level INT DEFAULT 10,
-  warehouse_location TEXT,
-  last_counted TIMESTAMP WITH TIME ZONE,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  UNIQUE(product_id)
-);
-
-CREATE INDEX IF NOT EXISTS idx_inventory_product_id ON inventory(product_id);
+CREATE INDEX IF NOT EXISTS idx_inventory_balances_item_id ON public.inventory_balances(item_id);
 
 -- Sales Orders table
-CREATE TABLE IF NOT EXISTS sales_orders (
+CREATE TABLE IF NOT EXISTS public.sales_orders (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  order_number TEXT UNIQUE NOT NULL,
-  customer_id UUID NOT NULL REFERENCES customers(id) ON DELETE CASCADE,
+  order_number TEXT NOT NULL,
+  sequence_base TEXT,
+  customer_id UUID NOT NULL REFERENCES public.customers(id) ON DELETE CASCADE,
+  status TEXT NOT NULL DEFAULT 'draft',
   order_date TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   delivery_date DATE,
-  status sale_order_status DEFAULT 'draft',
-  total_amount DECIMAL(15, 2),
   notes TEXT,
-  created_by UUID REFERENCES users(id),
+  total_amount DECIMAL(15, 2),
+  created_by UUID REFERENCES public.users(id),
+  approved_by UUID REFERENCES public.users(id),
+  approved_at TIMESTAMP WITH TIME ZONE,
+  po_number TEXT,
+  po_file_path TEXT,
+  po_file_name TEXT,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  CONSTRAINT sales_orders_order_number_key UNIQUE (order_number)
+);
+
+CREATE INDEX IF NOT EXISTS idx_sales_orders_customer_id ON public.sales_orders(customer_id);
+
+-- Sales Order Lines (replaces sales_order_items)
+CREATE TABLE IF NOT EXISTS public.sales_order_lines (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  sales_order_id UUID NOT NULL REFERENCES public.sales_orders(id) ON DELETE CASCADE,
+  item_id UUID NOT NULL REFERENCES public.items(id) ON DELETE CASCADE,
+  line_kind TEXT NOT NULL DEFAULT 'stock',
+  quantity NUMERIC(14, 3) NOT NULL CHECK (quantity > 0),
+  unit_price DECIMAL(15, 2),
+  line_total DECIMAL(15, 2),
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
-CREATE INDEX IF NOT EXISTS idx_sales_orders_customer_id ON sales_orders(customer_id);
-CREATE INDEX IF NOT EXISTS idx_sales_orders_status ON sales_orders(status);
-
--- Sales Order Line Items
-CREATE TABLE IF NOT EXISTS sales_order_items (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  sales_order_id UUID NOT NULL REFERENCES sales_orders(id) ON DELETE CASCADE,
-  product_id UUID NOT NULL REFERENCES products(id) ON DELETE CASCADE,
-  quantity INT NOT NULL,
-  unit_price DECIMAL(15, 2),
-  line_total DECIMAL(15, 2),
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
-
-CREATE INDEX IF NOT EXISTS idx_sales_order_items_sales_order_id ON sales_order_items(sales_order_id);
-
--- Purchase Orders table
-CREATE TABLE IF NOT EXISTS purchase_orders (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  po_number TEXT UNIQUE NOT NULL,
-  supplier_id UUID NOT NULL REFERENCES suppliers(id) ON DELETE CASCADE,
-  order_date TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  expected_delivery_date DATE,
-  status purchase_order_status DEFAULT 'draft',
-  total_amount DECIMAL(15, 2),
-  notes TEXT,
-  created_by UUID REFERENCES users(id),
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
-
-CREATE INDEX IF NOT EXISTS idx_purchase_orders_supplier_id ON purchase_orders(supplier_id);
-CREATE INDEX IF NOT EXISTS idx_purchase_orders_status ON purchase_orders(status);
-
--- Purchase Order Line Items
-CREATE TABLE IF NOT EXISTS purchase_order_items (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  purchase_order_id UUID NOT NULL REFERENCES purchase_orders(id) ON DELETE CASCADE,
-  product_id UUID NOT NULL REFERENCES products(id) ON DELETE CASCADE,
-  quantity INT NOT NULL,
-  unit_price DECIMAL(15, 2),
-  line_total DECIMAL(15, 2),
-  received_qty INT DEFAULT 0,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
-
-CREATE INDEX IF NOT EXISTS idx_purchase_order_items_purchase_order_id ON purchase_order_items(purchase_order_id);
+CREATE INDEX IF NOT EXISTS idx_sales_order_lines_order_id ON public.sales_order_lines(sales_order_id);
 
 -- Work Orders table
-CREATE TABLE IF NOT EXISTS work_orders (
+CREATE TABLE IF NOT EXISTS public.work_orders (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  wo_number TEXT UNIQUE NOT NULL,
-  sales_order_id UUID NOT NULL REFERENCES sales_orders(id) ON DELETE CASCADE,
-  status work_order_status DEFAULT 'pending',
-  start_date TIMESTAMP WITH TIME ZONE,
-  end_date TIMESTAMP WITH TIME ZONE,
-  assigned_to UUID REFERENCES users(id),
-  quantity_required INT,
-  quantity_completed INT DEFAULT 0,
-  notes TEXT,
+  wo_number TEXT NOT NULL,
+  sales_order_id UUID NOT NULL REFERENCES public.sales_orders(id) ON DELETE CASCADE,
+  sales_order_line_id UUID REFERENCES public.sales_order_lines(id) ON DELETE SET NULL,
+  wo_sub_index INTEGER,
+  sequence_base TEXT,
+  status TEXT NOT NULL DEFAULT 'pending',
+  created_by UUID REFERENCES public.users(id),
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  CONSTRAINT work_orders_wo_number_key UNIQUE (wo_number)
+);
+
+CREATE INDEX IF NOT EXISTS idx_work_orders_sales_order_id ON public.work_orders(sales_order_id);
+
+-- Work Order Lines (replaces work_order_items)
+CREATE TABLE IF NOT EXISTS public.work_order_lines (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  work_order_id UUID NOT NULL REFERENCES public.work_orders(id) ON DELETE CASCADE,
+  item_id UUID NOT NULL REFERENCES public.items(id) ON DELETE CASCADE,
+  qty_ordered NUMERIC(14, 3) NOT NULL CHECK (qty_ordered > 0),
+  qty_produced NUMERIC(14, 3) NOT NULL DEFAULT 0 CHECK (qty_produced >= 0),
+  qty_shipped NUMERIC(14, 3) NOT NULL DEFAULT 0 CHECK (qty_shipped >= 0),
+  qty_ready_to_ship NUMERIC(14, 3) NOT NULL DEFAULT 0 CHECK (qty_ready_to_ship >= 0),
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
-CREATE INDEX IF NOT EXISTS idx_work_orders_sales_order_id ON work_orders(sales_order_id);
-CREATE INDEX IF NOT EXISTS idx_work_orders_status ON work_orders(status);
+CREATE INDEX IF NOT EXISTS idx_work_order_lines_wo_id ON public.work_order_lines(work_order_id);
 
--- Material Entry table (for inventory stock entry/debit)
-CREATE TABLE IF NOT EXISTS material_entries (
+-- Purchase Orders table
+CREATE TABLE IF NOT EXISTS public.purchase_orders (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  entry_type TEXT NOT NULL, -- 'purchase', 'work_order', 'adjustment'
-  reference_id UUID,
-  product_id UUID NOT NULL REFERENCES products(id) ON DELETE CASCADE,
-  quantity INT NOT NULL,
-  status material_entry_status DEFAULT 'pending',
+  po_number TEXT NOT NULL,
+  supplier_id UUID NOT NULL REFERENCES public.suppliers(id) ON DELETE CASCADE,
+  expected_delivery_date DATE,
   notes TEXT,
-  approved_by UUID REFERENCES users(id),
-  created_by UUID REFERENCES users(id),
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
-
-CREATE INDEX IF NOT EXISTS idx_material_entries_product_id ON material_entries(product_id);
-
--- Stock Entry table (debit/credit for inventory)
-CREATE TABLE IF NOT EXISTS stock_entries (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  product_id UUID NOT NULL REFERENCES products(id) ON DELETE CASCADE,
-  reference_type TEXT NOT NULL, -- 'material_entry', 'work_order', 'sale_order'
-  reference_id UUID,
-  entry_type TEXT NOT NULL, -- 'debit', 'credit'
-  quantity INT NOT NULL,
-  notes TEXT,
-  created_by UUID REFERENCES users(id),
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
-
-CREATE INDEX IF NOT EXISTS idx_stock_entries_product_id ON stock_entries(product_id);
-
--- Invoices table
-CREATE TABLE IF NOT EXISTS invoices (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  invoice_number TEXT UNIQUE NOT NULL,
-  sales_order_id UUID REFERENCES sales_orders(id) ON DELETE SET NULL,
-  customer_id UUID NOT NULL REFERENCES customers(id) ON DELETE CASCADE,
-  invoice_date TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  due_date DATE,
-  status invoice_status DEFAULT 'draft',
+  purchase_employee_name TEXT,
   total_amount DECIMAL(15, 2),
-  paid_amount DECIMAL(15, 2) DEFAULT 0,
-  notes TEXT,
+  status TEXT NOT NULL DEFAULT 'draft',
+  created_by UUID REFERENCES public.users(id),
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  CONSTRAINT purchase_orders_po_number_key UNIQUE (po_number)
+);
+
+CREATE INDEX IF NOT EXISTS idx_purchase_orders_supplier_id ON public.purchase_orders(supplier_id);
+
+-- Purchase Order Lines (replaces purchase_order_items)
+CREATE TABLE IF NOT EXISTS public.purchase_order_lines (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  purchase_order_id UUID NOT NULL REFERENCES public.purchase_orders(id) ON DELETE CASCADE,
+  item_id UUID NOT NULL REFERENCES public.items(id) ON DELETE CASCADE,
+  quantity NUMERIC(14, 3) NOT NULL CHECK (quantity > 0),
+  unit_price DECIMAL(15, 2),
+  line_total DECIMAL(15, 2),
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
-CREATE INDEX IF NOT EXISTS idx_invoices_customer_id ON invoices(customer_id);
-CREATE INDEX IF NOT EXISTS idx_invoices_status ON invoices(status);
+CREATE INDEX IF NOT EXISTS idx_purchase_order_lines_po_id ON public.purchase_order_lines(purchase_order_id);
 
--- Payments table
-CREATE TABLE IF NOT EXISTS payments (
+-- General Entries table
+CREATE TABLE IF NOT EXISTS public.general_entries (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  invoice_id UUID NOT NULL REFERENCES invoices(id) ON DELETE CASCADE,
-  amount DECIMAL(15, 2),
+  ge_number TEXT NOT NULL,
+  description TEXT NOT NULL,
+  category TEXT,
+  employee_payee_id UUID, -- References employees(id) (foreign key left off initially to avoid dependency loop)
+  amount DECIMAL(15, 2) NOT NULL CHECK (amount > 0),
+  entry_date DATE DEFAULT CURRENT_DATE,
+  created_by UUID REFERENCES public.users(id),
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  CONSTRAINT general_entries_ge_number_key UNIQUE (ge_number)
+);
+
+CREATE INDEX IF NOT EXISTS idx_general_entries_payee_id ON public.general_entries(employee_payee_id);
+
+-- Payments table (replaces payments - will be renamed to payment_entries in migrations)
+CREATE TABLE IF NOT EXISTS public.payments (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  target public.payment_target NOT NULL,
+  sales_invoice_id UUID, -- References sales_invoices(id)
+  general_entry_id UUID REFERENCES public.general_entries(id),
+  amount DECIMAL(15, 2) NOT NULL CHECK (amount > 0),
   payment_date TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   payment_method TEXT,
   reference_number TEXT,
   notes TEXT,
-  created_by UUID REFERENCES users(id),
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
-
-CREATE INDEX IF NOT EXISTS idx_payments_invoice_id ON payments(invoice_id);
-
--- Employees table
-CREATE TABLE IF NOT EXISTS employees (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  employee_id TEXT UNIQUE NOT NULL,
-  department TEXT,
-  position TEXT,
-  hire_date DATE,
-  salary DECIMAL(15, 2),
-  is_active BOOLEAN DEFAULT true,
+  recorded_by UUID REFERENCES public.users(id),
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
-CREATE INDEX IF NOT EXISTS idx_employees_user_id ON employees(user_id);
-
--- Finance Transactions table
-CREATE TABLE IF NOT EXISTS finance_transactions (
+-- Sales Invoices table (replaces invoices)
+CREATE TABLE IF NOT EXISTS public.sales_invoices (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  transaction_type TEXT NOT NULL, -- 'invoice', 'payment', 'expense', 'adjustment'
-  reference_id UUID,
-  amount DECIMAL(15, 2),
-  description TEXT,
-  category TEXT,
-  transaction_date TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  created_by UUID REFERENCES users(id),
+  invoice_number TEXT NOT NULL,
+  sales_order_id UUID REFERENCES public.sales_orders(id) ON DELETE SET NULL,
+  work_order_id UUID REFERENCES public.work_orders(id) ON DELETE SET NULL,
+  customer_id UUID REFERENCES public.customers(id) ON DELETE CASCADE,
+  sequence_base TEXT,
+  sub_index INTEGER,
+  due_date DATE,
+  notes TEXT,
+  total_amount DECIMAL(15, 2),
+  accountant_name TEXT,
+  created_by UUID REFERENCES public.users(id),
+  status TEXT NOT NULL DEFAULT 'draft',
+  approved_by UUID REFERENCES public.users(id),
+  approved_at TIMESTAMP WITH TIME ZONE,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  CONSTRAINT sales_invoices_invoice_number_key UNIQUE (invoice_number)
+);
+
+CREATE INDEX IF NOT EXISTS idx_sales_invoices_customer_id ON public.sales_invoices(customer_id);
+
+-- Sales Invoice Lines table
+CREATE TABLE IF NOT EXISTS public.sales_invoice_lines (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  sales_invoice_id UUID NOT NULL REFERENCES public.sales_invoices(id) ON DELETE CASCADE,
+  item_id UUID NOT NULL REFERENCES public.items(id) ON DELETE CASCADE,
+  quantity NUMERIC(14, 3) NOT NULL CHECK (quantity > 0),
+  unit_price DECIMAL(15, 2),
+  line_total DECIMAL(15, 2),
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_sales_invoice_lines_invoice_id ON public.sales_invoice_lines(sales_invoice_id);
+
+-- Material Entries table
+CREATE TABLE IF NOT EXISTS public.material_entries (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  me_number TEXT NOT NULL,
+  work_order_id UUID REFERENCES public.work_orders(id) ON DELETE SET NULL,
+  sequence_base TEXT,
+  sub_index INTEGER,
+  entry_kind TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'pending',
+  production_employee_name TEXT,
+  notes TEXT,
+  created_by UUID REFERENCES public.users(id),
+  approved_by UUID REFERENCES public.users(id),
+  approved_at TIMESTAMP WITH TIME ZONE,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  CONSTRAINT material_entries_me_number_key UNIQUE (me_number)
+);
+
+-- Material Entry Lines table
+CREATE TABLE IF NOT EXISTS public.material_entry_lines (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  material_entry_id UUID NOT NULL REFERENCES public.material_entries(id) ON DELETE CASCADE,
+  item_id UUID NOT NULL REFERENCES public.items(id) ON DELETE CASCADE,
+  quantity NUMERIC(14, 3) NOT NULL CHECK (quantity > 0),
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
-CREATE INDEX IF NOT EXISTS idx_finance_transactions_type ON finance_transactions(transaction_type);
+CREATE INDEX IF NOT EXISTS idx_material_entry_lines_me_id ON public.material_entry_lines(material_entry_id);
 
--- Enable Row Level Security (RLS)
-ALTER TABLE users ENABLE ROW LEVEL SECURITY;
-ALTER TABLE customers ENABLE ROW LEVEL SECURITY;
-ALTER TABLE suppliers ENABLE ROW LEVEL SECURITY;
-ALTER TABLE products ENABLE ROW LEVEL SECURITY;
-ALTER TABLE inventory ENABLE ROW LEVEL SECURITY;
-ALTER TABLE sales_orders ENABLE ROW LEVEL SECURITY;
-ALTER TABLE sales_order_items ENABLE ROW LEVEL SECURITY;
-ALTER TABLE purchase_orders ENABLE ROW LEVEL SECURITY;
-ALTER TABLE purchase_order_items ENABLE ROW LEVEL SECURITY;
-ALTER TABLE work_orders ENABLE ROW LEVEL SECURITY;
-ALTER TABLE material_entries ENABLE ROW LEVEL SECURITY;
-ALTER TABLE stock_entries ENABLE ROW LEVEL SECURITY;
-ALTER TABLE invoices ENABLE ROW LEVEL SECURITY;
-ALTER TABLE payments ENABLE ROW LEVEL SECURITY;
-ALTER TABLE employees ENABLE ROW LEVEL SECURITY;
-ALTER TABLE finance_transactions ENABLE ROW LEVEL SECURITY;
+-- BOM Headers table
+CREATE TABLE IF NOT EXISTS public.bom_headers (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  bom_code TEXT NOT NULL,
+  parent_item_id UUID REFERENCES public.items(id) ON DELETE CASCADE,
+  version INTEGER DEFAULT 1,
+  is_active BOOLEAN DEFAULT true,
+  is_default BOOLEAN DEFAULT false,
+  output_quantity NUMERIC(14, 3) DEFAULT 1,
+  output_uom TEXT DEFAULT 'pcs',
+  description TEXT,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  CONSTRAINT bom_headers_bom_code_unique UNIQUE (bom_code)
+);
 
--- RLS Policies for users table - allow users to see their own data
-CREATE POLICY "Users can view their own data" ON users
+-- BOM Lines table
+CREATE TABLE IF NOT EXISTS public.bom_lines (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  bom_id UUID NOT NULL REFERENCES public.bom_headers(id) ON DELETE CASCADE,
+  line_no INTEGER,
+  component_item_id UUID REFERENCES public.items(id) ON DELETE CASCADE,
+  component_name TEXT,
+  uom TEXT,
+  unit_cost DECIMAL(15, 2),
+  quantity_per NUMERIC(14, 3) NOT NULL CHECK (quantity_per > 0),
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_bom_lines_bom_id ON public.bom_lines(bom_id);
+
+-- Stock Entries table
+CREATE TABLE IF NOT EXISTS public.stock_entries (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  se_number TEXT NOT NULL,
+  work_order_id UUID REFERENCES public.work_orders(id) ON DELETE SET NULL,
+  material_entry_id UUID REFERENCES public.material_entries(id) ON DELETE SET NULL,
+  purpose TEXT NOT NULL,
+  sequence_base TEXT,
+  sub_index INTEGER,
+  store_employee_name TEXT,
+  notes TEXT,
+  created_by UUID REFERENCES public.users(id),
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  CONSTRAINT stock_entries_se_number_key UNIQUE (se_number)
+);
+
+-- Stock Entry Lines table
+CREATE TABLE IF NOT EXISTS public.stock_entry_lines (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  stock_entry_id UUID NOT NULL REFERENCES public.stock_entries(id) ON DELETE CASCADE,
+  item_id UUID NOT NULL REFERENCES public.items(id) ON DELETE CASCADE,
+  quantity NUMERIC(14, 3) NOT NULL CHECK (quantity > 0),
+  direction TEXT NOT NULL CHECK (direction in ('in', 'out')),
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_stock_entry_lines_se_id ON public.stock_entry_lines(stock_entry_id);
+
+-- Stock Ledger table
+CREATE TABLE IF NOT EXISTS public.stock_ledger (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  item_id UUID NOT NULL REFERENCES public.items(id) ON DELETE CASCADE,
+  qty_delta NUMERIC(14, 3) NOT NULL,
+  ref_type TEXT NOT NULL,
+  ref_id UUID NOT NULL,
+  stock_entry_id UUID REFERENCES public.stock_entries(id) ON DELETE CASCADE,
+  stock_entry_line_id UUID REFERENCES public.stock_entry_lines(id) ON DELETE CASCADE,
+  created_by UUID REFERENCES public.users(id),
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_stock_ledger_item_id ON public.stock_ledger(item_id);
+
+-- Wastage table
+CREATE TABLE IF NOT EXISTS public.wastage (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  work_order_id UUID REFERENCES public.work_orders(id) ON DELETE CASCADE,
+  material_entry_id UUID REFERENCES public.material_entries(id) ON DELETE CASCADE,
+  item_id UUID REFERENCES public.items(id) ON DELETE CASCADE,
+  quantity NUMERIC(14, 3) NOT NULL CHECK (quantity > 0),
+  status TEXT NOT NULL DEFAULT 'pending',
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_wastage_wo_id ON public.wastage(work_order_id);
+
+-- Sequence Registry table
+CREATE TABLE IF NOT EXISTS public.sequence_registry (
+  scope TEXT PRIMARY KEY,
+  last_value BIGINT NOT NULL DEFAULT 0,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Enable Row Level Security (RLS) on all base tables
+ALTER TABLE public.users ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.customers ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.suppliers ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.items ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.inventory_balances ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.sales_orders ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.sales_order_lines ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.work_orders ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.work_order_lines ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.purchase_orders ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.purchase_order_lines ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.general_entries ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.payments ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.sales_invoices ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.sales_invoice_lines ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.material_entries ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.material_entry_lines ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.bom_headers ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.bom_lines ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.stock_entries ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.stock_entry_lines ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.stock_ledger ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.wastage ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.sequence_registry ENABLE ROW LEVEL SECURITY;
+
+-- RLS Policies for users table
+CREATE POLICY "Users can view their own data" ON public.users
   FOR SELECT USING (auth.uid() = auth_id);
 
-CREATE POLICY "Users can update their own data" ON users
+CREATE POLICY "Users can update their own data" ON public.users
   FOR UPDATE USING (auth.uid() = auth_id);
 
--- RLS Policies for other tables - allow all authenticated users to read (can be made more restrictive)
-CREATE POLICY "Users can read customers" ON customers
-  FOR SELECT USING (auth.role() = 'authenticated');
+-- General read access policy for other tables (for authenticated users)
+CREATE POLICY "Users can read customers" ON public.customers FOR SELECT USING (auth.role() = 'authenticated');
+CREATE POLICY "Users can read suppliers" ON public.suppliers FOR SELECT USING (auth.role() = 'authenticated');
+CREATE POLICY "Users can read items" ON public.items FOR SELECT USING (auth.role() = 'authenticated');
+CREATE POLICY "Users can read inventory_balances" ON public.inventory_balances FOR SELECT USING (auth.role() = 'authenticated');
+CREATE POLICY "Users can read sales_orders" ON public.sales_orders FOR SELECT USING (auth.role() = 'authenticated');
+CREATE POLICY "Users can read sales_order_lines" ON public.sales_order_lines FOR SELECT USING (auth.role() = 'authenticated');
+CREATE POLICY "Users can read work_orders" ON public.work_orders FOR SELECT USING (auth.role() = 'authenticated');
+CREATE POLICY "Users can read work_order_lines" ON public.work_order_lines FOR SELECT USING (auth.role() = 'authenticated');
+CREATE POLICY "Users can read purchase_orders" ON public.purchase_orders FOR SELECT USING (auth.role() = 'authenticated');
+CREATE POLICY "Users can read purchase_order_lines" ON public.purchase_order_lines FOR SELECT USING (auth.role() = 'authenticated');
+CREATE POLICY "Users can read general_entries" ON public.general_entries FOR SELECT USING (auth.role() = 'authenticated');
+CREATE POLICY "Users can read payments" ON public.payments FOR SELECT USING (auth.role() = 'authenticated');
+CREATE POLICY "Users can read sales_invoices" ON public.sales_invoices FOR SELECT USING (auth.role() = 'authenticated');
+CREATE POLICY "Users can read sales_invoice_lines" ON public.sales_invoice_lines FOR SELECT USING (auth.role() = 'authenticated');
+CREATE POLICY "Users can read material_entries" ON public.material_entries FOR SELECT USING (auth.role() = 'authenticated');
+CREATE POLICY "Users can read material_entry_lines" ON public.material_entry_lines FOR SELECT USING (auth.role() = 'authenticated');
+CREATE POLICY "Users can read bom_headers" ON public.bom_headers FOR SELECT USING (auth.role() = 'authenticated');
+CREATE POLICY "Users can read bom_lines" ON public.bom_lines FOR SELECT USING (auth.role() = 'authenticated');
+CREATE POLICY "Users can read stock_entries" ON public.stock_entries FOR SELECT USING (auth.role() = 'authenticated');
+CREATE POLICY "Users can read stock_entry_lines" ON public.stock_entry_lines FOR SELECT USING (auth.role() = 'authenticated');
+CREATE POLICY "Users can read stock_ledger" ON public.stock_ledger FOR SELECT USING (auth.role() = 'authenticated');
+CREATE POLICY "Users can read wastage" ON public.wastage FOR SELECT USING (auth.role() = 'authenticated');
+CREATE POLICY "Users can read sequence_registry" ON public.sequence_registry FOR SELECT USING (auth.role() = 'authenticated');
 
-CREATE POLICY "Users can read suppliers" ON suppliers
-  FOR SELECT USING (auth.role() = 'authenticated');
+-- Grant privileges on all currently created objects
+GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO postgres, anon, authenticated, service_role;
+GRANT ALL PRIVILEGES ON ALL FUNCTIONS IN SCHEMA public TO postgres, anon, authenticated, service_role;
+GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO postgres, anon, authenticated, service_role;
 
-CREATE POLICY "Users can read products" ON products
-  FOR SELECT USING (auth.role() = 'authenticated');
-
-CREATE POLICY "Users can read inventory" ON inventory
-  FOR SELECT USING (auth.role() = 'authenticated');
-
-CREATE POLICY "Users can read sales orders" ON sales_orders
-  FOR SELECT USING (auth.role() = 'authenticated');
-
-CREATE POLICY "Users can read sales order items" ON sales_order_items
-  FOR SELECT USING (auth.role() = 'authenticated');
-
-CREATE POLICY "Users can read purchase orders" ON purchase_orders
-  FOR SELECT USING (auth.role() = 'authenticated');
-
-CREATE POLICY "Users can read purchase order items" ON purchase_order_items
-  FOR SELECT USING (auth.role() = 'authenticated');
-
-CREATE POLICY "Users can read work orders" ON work_orders
-  FOR SELECT USING (auth.role() = 'authenticated');
-
-CREATE POLICY "Users can read material entries" ON material_entries
-  FOR SELECT USING (auth.role() = 'authenticated');
-
-CREATE POLICY "Users can read stock entries" ON stock_entries
-  FOR SELECT USING (auth.role() = 'authenticated');
-
-CREATE POLICY "Users can read invoices" ON invoices
-  FOR SELECT USING (auth.role() = 'authenticated');
-
-CREATE POLICY "Users can read payments" ON payments
-  FOR SELECT USING (auth.role() = 'authenticated');
-
-CREATE POLICY "Users can read employees" ON employees
-  FOR SELECT USING (auth.role() = 'authenticated');
-
-CREATE POLICY "Users can read finance transactions" ON finance_transactions
-  FOR SELECT USING (auth.role() = 'authenticated');
-
--- Insert sample data (optional)
--- You can uncomment these to add test data
-
--- INSERT INTO customers (name, email, phone, contact_person) VALUES
--- ('ABC Manufacturing Ltd', 'contact@abc.com', '1234567890', 'John Doe'),
--- ('XYZ Industries', 'info@xyz.com', '0987654321', 'Jane Smith');
-
--- INSERT INTO suppliers (name, email, phone, contact_person) VALUES
--- ('Steel Supplies Inc', 'sales@steel.com', '1112223333', 'Mike Johnson'),
--- ('Plastic Components Ltd', 'support@plastic.com', '4445556666', 'Sarah Williams');
-
--- INSERT INTO products (code, name, category, unit_price, reorder_level) VALUES
--- ('PROD-001', 'Steel Sheet A1', 'Raw Materials', 150.00, 20),
--- ('PROD-002', 'Plastic Pellets', 'Raw Materials', 50.00, 50),
--- ('PROD-003', 'Assembly Part X', 'Components', 75.00, 15);
