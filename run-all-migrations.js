@@ -49,6 +49,53 @@ async function start() {
     await client.connect();
     console.log('Connected successfully!');
 
+    // 0. Ensure default Supabase roles and auth schema exist (necessary for raw local Postgres setups)
+    console.log('Ensuring default Supabase roles and auth schema exist...');
+    await client.query(`
+      DO $$
+      BEGIN
+        IF NOT EXISTS (SELECT FROM pg_catalog.pg_roles WHERE rolname = 'anon') THEN
+          CREATE ROLE anon;
+        END IF;
+        IF NOT EXISTS (SELECT FROM pg_catalog.pg_roles WHERE rolname = 'authenticated') THEN
+          CREATE ROLE authenticated;
+        END IF;
+        IF NOT EXISTS (SELECT FROM pg_catalog.pg_roles WHERE rolname = 'service_role') THEN
+          CREATE ROLE service_role;
+        END IF;
+      END
+      $$;
+
+      CREATE SCHEMA IF NOT EXISTS auth;
+      CREATE OR REPLACE FUNCTION auth.uid() RETURNS uuid LANGUAGE sql STABLE AS 'SELECT null::uuid;';
+      CREATE OR REPLACE FUNCTION auth.role() RETURNS text LANGUAGE sql STABLE AS 'SELECT ''authenticated''::text;';
+
+      CREATE SCHEMA IF NOT EXISTS storage;
+      CREATE TABLE IF NOT EXISTS storage.buckets (
+        id text PRIMARY KEY,
+        name text NOT NULL,
+        public boolean DEFAULT false,
+        created_at timestamptz DEFAULT now(),
+        updated_at timestamptz DEFAULT now(),
+        owner uuid,
+        file_size_limit bigint,
+        allowed_mime_types text[]
+      );
+
+      CREATE TABLE IF NOT EXISTS storage.objects (
+        id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+        bucket_id text REFERENCES storage.buckets(id),
+        name text,
+        owner uuid,
+        created_at timestamptz DEFAULT now(),
+        updated_at timestamptz DEFAULT now(),
+        last_accessed_at timestamptz DEFAULT now(),
+        metadata jsonb
+      );
+
+      ALTER TABLE storage.objects ENABLE ROW LEVEL SECURITY;
+    `);
+
     // 1. Run the base setup-database.sql from ERP-Frontend
     const baseSchemaPath = path.resolve('setup-database.sql');
     if (fs.existsSync(baseSchemaPath)) {
