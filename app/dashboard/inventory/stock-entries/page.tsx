@@ -30,7 +30,7 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { Badge } from '@/components/ui/badge'
-import { ArrowUpDown, ClipboardList, Filter, Plus, Search } from 'lucide-react'
+import { ArrowUpDown, ArrowRightLeft, ClipboardList, Filter, Plus, Search } from 'lucide-react'
 import { erpFetch } from '@/lib/erp-api'
 import { cn } from '@/lib/utils'
 
@@ -61,6 +61,7 @@ const PURPOSE_LABEL: Record<string, string> = {
   receipt_purchase: 'Receipt (purchase)',
   dispatch_sales: 'Dispatch (sales)',
   wastage_movement: 'Wastage movement',
+  warehouse_transfer: 'Warehouse transfer',
 }
 
 const PURPOSE_KEYS = Object.keys(PURPOSE_LABEL) as Array<keyof typeof PURPOSE_LABEL>
@@ -221,12 +222,20 @@ export default function StockEntriesListPage() {
             update on-hand quantities immediately.
           </p>
         </div>
-        <Button className="flex items-center gap-2 shrink-0" asChild>
-          <Link href="/dashboard/inventory/stock-entries/new">
-            <Plus size={18} />
-            Create stock entry
-          </Link>
-        </Button>
+        <div className="flex flex-wrap gap-2 shrink-0">
+          <Button variant="outline" className="flex items-center gap-2" asChild>
+            <Link href="/dashboard/inventory/stock-entries/transfer">
+              <ArrowRightLeft size={18} />
+              Transfer
+            </Link>
+          </Button>
+          <Button className="flex items-center gap-2" asChild>
+            <Link href="/dashboard/inventory/stock-entries/new">
+              <Plus size={18} />
+              Create stock entry
+            </Link>
+          </Button>
+        </div>
       </div>
 
       {error && (

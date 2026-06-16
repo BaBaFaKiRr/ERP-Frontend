@@ -13,7 +13,13 @@ type PaymentEntryDetail = {
   payment_entry_number?: string | null
   payment_date?: string | null
   amount?: number | null
+  direction?: 'made' | 'received' | null
+  against_type?: string | null
   entity_name?: string | null
+  general_party_name?: string | null
+  general_party_details?: string | null
+  misc_title?: string | null
+  misc_description?: string | null
   deposited_name_on_account?: string | null
   deposited_bank_name?: string | null
   deposited_account_number?: string | null
@@ -22,8 +28,20 @@ type PaymentEntryDetail = {
   suppliers?: { name?: string | null; supplier_code?: string | null } | null
   customers?: { name?: string | null } | null
   purchase_invoices?: { id?: string | null; pi_number?: string | null } | null
+  payment_accounts?: { name?: string | null; purpose?: string | null } | null
+  dispatch_sales_invoices?: { id?: string | null; invoice_number?: string | null } | null
+  purchase_orders?: { id?: string | null; po_number?: string | null } | null
+  employees?: { id?: string | null; full_name?: string | null; employee_code?: string | null } | null
   created_by_user?: { first_name?: string | null; last_name?: string | null; email?: string | null } | null
   created_at?: string | null
+}
+
+const AGAINST_LABELS: Record<string, string> = {
+  sales_invoice: 'Sales Invoice',
+  purchase_order: 'Purchase Order',
+  general_entry: 'General Entry',
+  wages: 'Wages',
+  miscellaneous: 'Miscellaneous',
 }
 
 export default function PaymentEntryDetailPage() {
@@ -51,6 +69,12 @@ export default function PaymentEntryDetailPage() {
 
   const entityLabel = useMemo(() => {
     if (!data) return '—'
+    if (data.general_party_name?.trim()) return data.general_party_name
+    if (data.misc_title?.trim()) return data.misc_title
+    if (data.employees?.full_name) {
+      const code = data.employees.employee_code?.trim()
+      return `${code ? `${code} - ` : ''}${data.employees.full_name}`
+    }
     if (data.suppliers?.name) {
       const code = data.suppliers.supplier_code?.trim()
       return `${code ? `${code} - ` : ''}${data.suppliers.name}`
@@ -91,21 +115,75 @@ export default function PaymentEntryDetailPage() {
         </CardHeader>
         <CardContent className="grid grid-cols-1 gap-4 text-sm md:grid-cols-2">
           <div>
-            <p className="text-muted-foreground">Entity</p>
+            <p className="text-muted-foreground">Direction</p>
+            <p className="font-medium">
+              {data.direction === 'made'
+                ? 'Payment Made (Outward −)'
+                : data.direction === 'received'
+                  ? 'Payment Received (Inward +)'
+                  : '—'}
+            </p>
+          </div>
+          <div>
+            <p className="text-muted-foreground">Against</p>
+            <p className="font-medium">
+              {data.against_type ? (AGAINST_LABELS[data.against_type] ?? data.against_type) : '—'}
+            </p>
+          </div>
+          <div>
+            <p className="text-muted-foreground">Party / title</p>
             <p className="font-medium">{entityLabel}</p>
           </div>
           <div>
+            <p className="text-muted-foreground">Payment account</p>
+            <p className="font-medium">{data.payment_accounts?.name ?? '—'}</p>
+            {data.payment_accounts?.purpose ? (
+              <p className="text-sm text-muted-foreground">{data.payment_accounts.purpose}</p>
+            ) : null}
+          </div>
+          <div>
             <p className="text-muted-foreground">Payment date</p>
-            <p className="font-medium">{data.payment_date ? new Date(data.payment_date).toLocaleDateString('en-IN') : '—'}</p>
+            <p className="font-medium">
+              {data.payment_date ? new Date(data.payment_date).toLocaleDateString('en-IN') : '—'}
+            </p>
           </div>
           <div>
             <p className="text-muted-foreground">Amount</p>
             <p className="font-medium">₹{Number(data.amount ?? 0).toFixed(2)}</p>
           </div>
           <div>
+            <p className="text-muted-foreground">Sales invoice</p>
+            {data.dispatch_sales_invoices?.id ? (
+              <Link
+                href={`/dashboard/finance/sales-invoices/${data.dispatch_sales_invoices.id}`}
+                className="font-medium hover:underline"
+              >
+                {data.dispatch_sales_invoices.invoice_number ?? data.dispatch_sales_invoices.id}
+              </Link>
+            ) : (
+              <p className="font-medium">—</p>
+            )}
+          </div>
+          <div>
+            <p className="text-muted-foreground">Purchase order</p>
+            {data.purchase_orders?.id ? (
+              <Link
+                href={`/dashboard/purchase/orders/${data.purchase_orders.id}`}
+                className="font-medium hover:underline"
+              >
+                {data.purchase_orders.po_number ?? data.purchase_orders.id}
+              </Link>
+            ) : (
+              <p className="font-medium">—</p>
+            )}
+          </div>
+          <div>
             <p className="text-muted-foreground">Purchase invoice</p>
             {data.purchase_invoices?.id ? (
-              <Link href={`/dashboard/finance/purchase-invoices/${data.purchase_invoices.id}`} className="font-medium hover:underline">
+              <Link
+                href={`/dashboard/finance/purchase-invoices/${data.purchase_invoices.id}`}
+                className="font-medium hover:underline"
+              >
                 {data.purchase_invoices.pi_number ?? data.purchase_invoices.id}
               </Link>
             ) : (
@@ -118,18 +196,34 @@ export default function PaymentEntryDetailPage() {
           </div>
           <div>
             <p className="text-muted-foreground">Created at</p>
-            <p className="font-medium">{data.created_at ? new Date(data.created_at).toLocaleString('en-IN') : '—'}</p>
+            <p className="font-medium">
+              {data.created_at ? new Date(data.created_at).toLocaleString('en-IN') : '—'}
+            </p>
           </div>
+          {data.general_party_details?.trim() ? (
+            <div className="md:col-span-2">
+              <p className="text-muted-foreground">Party details</p>
+              <p className="font-medium whitespace-pre-wrap">{data.general_party_details}</p>
+            </div>
+          ) : null}
+          {data.misc_description?.trim() ? (
+            <div className="md:col-span-2">
+              <p className="text-muted-foreground">Description</p>
+              <p className="font-medium whitespace-pre-wrap">{data.misc_description}</p>
+            </div>
+          ) : null}
           <div className="md:col-span-2">
             <p className="text-muted-foreground">Deposited to</p>
             <p className="font-medium">
-              {data.deposited_name_on_account ?? '—'} · {data.deposited_bank_name ?? '—'} · {data.deposited_account_number ?? '—'} ·{' '}
-              {data.deposited_ifsc_code ?? '—'}
+              {data.deposited_name_on_account ?? '—'} · {data.deposited_bank_name ?? '—'} ·{' '}
+              {data.deposited_account_number ?? '—'} · {data.deposited_ifsc_code ?? '—'}
             </p>
           </div>
           <div className="md:col-span-2">
             <p className="text-muted-foreground">Payment receipt</p>
-            <p className="font-medium">{data.payment_receipt_file_name?.trim() ? data.payment_receipt_file_name : '—'}</p>
+            <p className="font-medium">
+              {data.payment_receipt_file_name?.trim() ? data.payment_receipt_file_name : '—'}
+            </p>
           </div>
         </CardContent>
       </Card>

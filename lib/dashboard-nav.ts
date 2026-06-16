@@ -27,6 +27,7 @@ export type NavItem = {
 export const INVENTORY_CHILDREN: NavChild[] = [
   { name: 'Items', href: '/dashboard/inventory/items' },
   { name: 'BOM', href: '/dashboard/inventory/bom' },
+  { name: 'Warehouses', href: '/dashboard/inventory/warehouses' },
   { name: 'Stock', href: '/dashboard/inventory' },
   { name: 'Stock entries', href: '/dashboard/inventory/stock-entries' },
   { name: 'Scrap', href: '/dashboard/inventory/scrap' },
@@ -49,6 +50,7 @@ export const ACCOUNTS_CHILDREN: NavChild[] = [
   { name: 'Debit Notes', href: '/dashboard/finance/debit-notes' },
   { name: 'Credit Notes', href: '/dashboard/finance/credit-notes' },
   { name: 'Payment Entries', href: '/dashboard/finance/payment-entries' },
+  { name: 'Payment Accounts', href: '/dashboard/finance/payment-accounts' },
   { name: 'Journal Entries', href: '/dashboard/finance/journal-entries' },
   { name: 'Statement of Account', href: '/dashboard/finance/statement-of-account' },
   { name: 'Settings', href: '/dashboard/finance/settings' },
