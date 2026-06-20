@@ -17,8 +17,19 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { Input } from '@/components/ui/input'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import {
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationLink,
+  PaginationEllipsis,
+  PaginationNext,
+  PaginationPrevious,
+} from '@/components/ui/pagination'
 import { EllipsisVertical, Filter, Plus, Search } from 'lucide-react'
 import { erpFetch } from '@/lib/erp-api'
+
+const PAGE_SIZE = 15
 
 type SupplierTypeFilter = 'all' | 'domestic' | 'international'
 
@@ -53,6 +64,7 @@ export default function SuppliersPage() {
   const [isAdmin, setIsAdmin] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
   const [typeFilter, setTypeFilter] = useState<SupplierTypeFilter>('all')
+  const [page, setPage] = useState(1)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -104,7 +116,32 @@ export default function SuppliersPage() {
     })
   }, [searchTerm, suppliers, typeFilter])
 
+  const totalPages = Math.max(1, Math.ceil(filteredSuppliers.length / PAGE_SIZE))
+
+  const paginatedSuppliers = useMemo(() => {
+    const start = (page - 1) * PAGE_SIZE
+    return filteredSuppliers.slice(start, start + PAGE_SIZE)
+  }, [filteredSuppliers, page])
+
+  useEffect(() => {
+    setPage(1)
+  }, [searchTerm, typeFilter])
+
+  useEffect(() => {
+    if (page > totalPages) setPage(totalPages)
+  }, [page, totalPages])
+
   const filterActive = typeFilter !== 'all'
+  const rangeStart = filteredSuppliers.length === 0 ? 0 : (page - 1) * PAGE_SIZE + 1
+  const rangeEnd = Math.min(page * PAGE_SIZE, filteredSuppliers.length)
+
+  const pageNumbers = useMemo(() => {
+    if (totalPages <= 7) {
+      return Array.from({ length: totalPages }, (_, i) => i + 1)
+    }
+    const pages = new Set<number>([1, totalPages, page, page - 1, page + 1])
+    return [...pages].filter((p) => p >= 1 && p <= totalPages).sort((a, b) => a - b)
+  }, [page, totalPages])
 
   return (
     <div className="p-8">
@@ -146,7 +183,9 @@ export default function SuppliersPage() {
             Search and view all suppliers
             {!loading && (
               <span className="mt-1 block text-xs text-muted-foreground">
-                Showing {filteredSuppliers.length} of {suppliers.length} suppliers
+                {filteredSuppliers.length === 0
+                  ? `Showing 0 of ${suppliers.length} suppliers`
+                  : `Showing ${rangeStart}–${rangeEnd} of ${filteredSuppliers.length} suppliers${filteredSuppliers.length !== suppliers.length ? ` (${suppliers.length} total)` : ''}`}
                 {searchTerm.trim() ? ` · matching “${searchTerm.trim()}”` : ''}
                 {filterActive ? ` · ${TYPE_FILTER_LABEL[typeFilter]}` : ''}
               </span>
@@ -221,7 +260,7 @@ export default function SuppliersPage() {
                     <TableCell colSpan={7}>No suppliers found.</TableCell>
                   </TableRow>
                 ) : (
-                  filteredSuppliers.map((supplier) => (
+                  paginatedSuppliers.map((supplier) => (
                     <TableRow
                       key={supplier.id}
                       className="cursor-pointer text-gray-800 dark:text-slate-200 hover:bg-gray-50 dark:hover:bg-slate-800/40"
@@ -248,6 +287,63 @@ export default function SuppliersPage() {
               </TableBody>
             </Table>
           </div>
+
+          {!loading && filteredSuppliers.length > 0 ? (
+            <div className="mt-6 flex flex-col items-center gap-3 sm:flex-row sm:justify-between">
+              <p className="text-sm text-muted-foreground">
+                Page {page} of {totalPages}
+              </p>
+              <Pagination className="mx-0 w-auto justify-end">
+                <PaginationContent>
+                  <PaginationItem>
+                    <PaginationPrevious
+                      href="#"
+                      onClick={(e) => {
+                        e.preventDefault()
+                        setPage((p) => Math.max(1, p - 1))
+                      }}
+                      className={page <= 1 ? 'pointer-events-none opacity-50' : undefined}
+                    />
+                  </PaginationItem>
+                  {pageNumbers.map((pageNum, index) => {
+                    const prev = pageNumbers[index - 1]
+                    const showEllipsisBefore = prev != null && pageNum - prev > 1
+                    return (
+                      <span key={pageNum} className="contents">
+                        {showEllipsisBefore ? (
+                          <PaginationItem>
+                            <PaginationEllipsis />
+                          </PaginationItem>
+                        ) : null}
+                        <PaginationItem>
+                          <PaginationLink
+                            href="#"
+                            isActive={pageNum === page}
+                            onClick={(e) => {
+                              e.preventDefault()
+                              setPage(pageNum)
+                            }}
+                          >
+                            {pageNum}
+                          </PaginationLink>
+                        </PaginationItem>
+                      </span>
+                    )
+                  })}
+                  <PaginationItem>
+                    <PaginationNext
+                      href="#"
+                      onClick={(e) => {
+                        e.preventDefault()
+                        setPage((p) => Math.min(totalPages, p + 1))
+                      }}
+                      className={page >= totalPages ? 'pointer-events-none opacity-50' : undefined}
+                    />
+                  </PaginationItem>
+                </PaginationContent>
+              </Pagination>
+            </div>
+          ) : null}
         </CardContent>
       </Card>
     </div>
