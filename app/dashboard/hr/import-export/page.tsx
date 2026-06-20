@@ -3,7 +3,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { ArrowLeft, Download } from 'lucide-react'
-import { erpFetch, erpFetchBlob, downloadBlob } from '@/lib/erp-api'
+import { erpFetch, erpFetchBlob, erpImportStream, downloadBlob, type ImportProgressUpdate } from '@/lib/erp-api'
+import { ImportProgressPanel } from '@/components/import/ImportProgressPanel'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Checkbox } from '@/components/ui/checkbox'
@@ -107,6 +108,7 @@ export default function ImportExportEmployeesPage() {
     EMPTY_EMPLOYEE_CONSTRAINTS,
   )
   const [importFile, setImportFile] = useState<File | null>(null)
+  const [importProgress, setImportProgress] = useState<ImportProgressUpdate | null>(null)
   const [operations, setOperations] = useState<OperationRow[]>([])
   const [loadingOps, setLoadingOps] = useState(true)
   const [busy, setBusy] = useState(false)
@@ -194,17 +196,12 @@ export default function ImportExportEmployeesPage() {
     setBusy(true)
     setError(null)
     setMessage(null)
+    setImportProgress(null)
     try {
       const formData = new FormData()
       formData.append('segment', 'employees')
       formData.append('file', importFile)
-      const res = await erpFetch<{
-        message?: string
-        warning?: string
-      }>('/api/data-import-export/import', {
-        method: 'POST',
-        body: formData,
-      })
+      const res = await erpImportStream(formData, setImportProgress)
       const parts = [res.message ?? 'Import completed.']
       if (res.warning?.trim()) {
         parts.push(res.warning.trim())
@@ -215,6 +212,7 @@ export default function ImportExportEmployeesPage() {
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Import failed')
     } finally {
+      setImportProgress(null)
       setBusy(false)
     }
   }
@@ -309,6 +307,9 @@ export default function ImportExportEmployeesPage() {
                 />
                 <p className="mt-1 text-xs text-muted-foreground">CSV or Excel (.xlsx, .xls)</p>
               </div>
+              {importProgress ? (
+                <ImportProgressPanel progress={importProgress} fileName={importFile?.name} />
+              ) : null}
             </>
           )}
 

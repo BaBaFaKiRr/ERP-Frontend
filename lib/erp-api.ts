@@ -207,3 +207,105 @@ export function downloadBlob(blob: Blob, filename: string) {
   anchor.click()
   URL.revokeObjectURL(url)
 }
+
+export type ImportProgressPhase = 'uploading' | 'parsing' | 'validating' | 'importing'
+
+export type ImportProgressUpdate = {
+  phase: ImportProgressPhase
+  processed: number
+  total: number
+  imported: number
+  skipped: number
+  message?: string
+}
+
+export type ImportStreamResult = {
+  message: string
+  warning?: string
+  imported: number
+  skipped: unknown[]
+}
+
+/** Streamed CSV/Excel import with real-time progress events from the backend. */
+export async function erpImportStream(
+  formData: FormData,
+  onProgress: (update: ImportProgressUpdate) => void,
+): Promise<ImportStreamResult> {
+  onProgress({
+    phase: 'uploading',
+    processed: 0,
+    total: 0,
+    imported: 0,
+    skipped: 0,
+    message: 'Uploading file…',
+  })
+
+  const url = `${getBaseUrl()}/api/data-import-export/import/stream`
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: await getAuthHeaders(true),
+    body: formData,
+  })
+
+  const contentType = res.headers.get('content-type') ?? ''
+  if (!contentType.includes('text/event-stream')) {
+    const text = await res.text()
+    let body: unknown = null
+    try {
+      body = text ? JSON.parse(text) : null
+    } catch {
+      body = { raw: text }
+    }
+    if (!res.ok) {
+      throw new Error(extractErrorMessage(body) || res.statusText || 'Import failed')
+    }
+    throw new Error('Unexpected import response')
+  }
+
+  const reader = res.body?.getReader()
+  if (!reader) throw new Error('Import stream unavailable')
+
+  const decoder = new TextDecoder()
+  let buffer = ''
+
+  while (true) {
+    const { done, value } = await reader.read()
+    if (done) break
+    buffer += decoder.decode(value, { stream: true })
+
+    const chunks = buffer.split('\n\n')
+    buffer = chunks.pop() ?? ''
+
+    for (const chunk of chunks) {
+      const line = chunk.trim()
+      if (!line.startsWith('data: ')) continue
+      const event = JSON.parse(line.slice(6)) as Record<string, unknown>
+
+      if (event.type === 'progress') {
+        onProgress({
+          phase: (event.phase as ImportProgressPhase) ?? 'importing',
+          processed: Number(event.processed ?? 0),
+          total: Number(event.total ?? 0),
+          imported: Number(event.imported ?? 0),
+          skipped: Number(event.skipped ?? 0),
+          message: typeof event.message === 'string' ? event.message : undefined,
+        })
+      } else if (event.type === 'done') {
+        return {
+          message: String(event.message ?? 'Import completed.'),
+          warning: typeof event.warning === 'string' ? event.warning : undefined,
+          imported: Number(event.imported ?? 0),
+          skipped: Array.isArray(event.skipped) ? event.skipped : [],
+        }
+      } else if (event.type === 'error') {
+        const parts = [typeof event.error === 'string' ? event.error : 'Import failed']
+        if (typeof event.message === 'string' && event.message.trim()) {
+          parts.push(event.message)
+        }
+        throw new Error(parts.join('\n\n'))
+      }
+    }
+  }
+
+  throw new Error('Import ended unexpectedly')
+}

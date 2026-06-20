@@ -4,7 +4,8 @@ import { Suspense, useCallback, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { ArrowLeft, Download } from 'lucide-react'
-import { erpFetch, erpFetchBlob, downloadBlob } from '@/lib/erp-api'
+import { erpFetch, erpFetchBlob, erpImportStream, downloadBlob, type ImportProgressUpdate } from '@/lib/erp-api'
+import { ImportProgressPanel } from '@/components/import/ImportProgressPanel'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Checkbox } from '@/components/ui/checkbox'
@@ -124,6 +125,7 @@ function ImportExportPageContent() {
     EMPTY_CUSTOMER_CONSTRAINTS,
   )
   const [importFile, setImportFile] = useState<File | null>(null)
+  const [importProgress, setImportProgress] = useState<ImportProgressUpdate | null>(null)
   const [operations, setOperations] = useState<OperationRow[]>([])
   const [loadingOps, setLoadingOps] = useState(true)
   const [busy, setBusy] = useState(false)
@@ -240,6 +242,7 @@ function ImportExportPageContent() {
     setBusy(true)
     setError(null)
     setMessage(null)
+    setImportProgress(null)
     try {
       const formData = new FormData()
       formData.append('segment', segment)
@@ -247,14 +250,7 @@ function ImportExportPageContent() {
       if (useConstraints && Object.keys(activeConstraints).length > 0) {
         formData.append('constraints', JSON.stringify(activeConstraints))
       }
-      const res = await erpFetch<{
-        message?: string
-        warning?: string
-        imported?: number
-      }>('/api/data-import-export/import', {
-        method: 'POST',
-        body: formData,
-      })
+      const res = await erpImportStream(formData, setImportProgress)
       const parts = [res.message ?? 'Import completed.']
       if (res.warning?.trim()) {
         parts.push(res.warning.trim())
@@ -271,6 +267,7 @@ function ImportExportPageContent() {
         setError(msg)
       }
     } finally {
+      setImportProgress(null)
       setBusy(false)
     }
   }
@@ -387,6 +384,9 @@ function ImportExportPageContent() {
               />
               <p className="mt-1 text-xs text-muted-foreground">CSV or Excel (.xlsx, .xls)</p>
               </div>
+              {importProgress ? (
+                <ImportProgressPanel progress={importProgress} fileName={importFile?.name} />
+              ) : null}
             </>
           )}
 
