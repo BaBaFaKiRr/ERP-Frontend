@@ -98,22 +98,24 @@ export default function SuppliersPage() {
   const filteredSuppliers = useMemo(() => {
     const term = searchTerm.trim().toLowerCase()
 
-    return suppliers.filter((supplier) => {
-      if (typeFilter !== 'all' && supplier.supplier_type !== typeFilter) return false
+    return suppliers
+      .filter((supplier) => {
+        if (typeFilter !== 'all' && supplier.supplier_type !== typeFilter) return false
 
-      if (!term) return true
+        if (!term) return true
 
-      const itemSearchHaystack = (supplier.supplier_items ?? [])
-        .map((row) => `${row.items?.sku ?? ''} ${row.items?.name ?? ''}`.trim().toLowerCase())
-        .join(' ')
+        const itemSearchHaystack = (supplier.supplier_items ?? [])
+          .map((row) => `${row.items?.sku ?? ''} ${row.items?.name ?? ''}`.trim().toLowerCase())
+          .join(' ')
 
-      return (
-        supplier.name.toLowerCase().includes(term) ||
-        (supplier.supplier_code ?? '').toLowerCase().includes(term) ||
-        (supplier.gst_number ?? '').toLowerCase().includes(term) ||
-        itemSearchHaystack.includes(term)
-      )
-    })
+        return (
+          supplier.name.toLowerCase().includes(term) ||
+          (supplier.supplier_code ?? '').toLowerCase().includes(term) ||
+          (supplier.gst_number ?? '').toLowerCase().includes(term) ||
+          itemSearchHaystack.includes(term)
+        )
+      })
+      .sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }))
   }, [searchTerm, suppliers, typeFilter])
 
   const totalPages = Math.max(1, Math.ceil(filteredSuppliers.length / PAGE_SIZE))

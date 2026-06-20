@@ -115,7 +115,7 @@ export default function ItemsListPage() {
   const [typeFilter, setTypeFilter] = useState<ItemTypeFilter>('all')
   const [activeFilter, setActiveFilter] = useState<ItemActiveFilter>('all')
   const [trackFilter, setTrackFilter] = useState<ItemTrackFilter>('all')
-  const [sortBy, setSortBy] = useState<ItemSortOption>('sku_asc')
+  const [sortBy, setSortBy] = useState<ItemSortOption>('name_asc')
   const [exportBusy, setExportBusy] = useState(false)
 
   const load = async () => {
@@ -278,7 +278,7 @@ export default function ItemsListPage() {
             {!loading && (
               <span className="block mt-1 text-xs text-muted-foreground">
                 Showing {displayed.length} of {items.length} items
-                {filterBits > 0 || sortBy !== 'sku_asc' ? (
+                {filterBits > 0 || sortBy !== 'name_asc' ? (
                   <>
                     {' '}
                     · {sortLabel[sortBy]}
