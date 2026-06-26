@@ -28,6 +28,7 @@ async function getAuthHeaders(): Promise<HeadersInit> {
   return {
     Authorization: `Bearer ${session.access_token}`,
     'Content-Type': 'application/json',
+    'Bypass-Tunnel-Reminder': 'true',
   }
 }
 

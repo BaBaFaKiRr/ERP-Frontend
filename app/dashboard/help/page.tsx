@@ -14,11 +14,14 @@ function newId(): string {
 }
 
 const SUGGESTED_HELP_PROMPTS = [
-  'How do I run database migrations?',
-  'How to deploy the app to Vercel?',
-  'Why is the database connection failing?',
-  'How do I add a new employee?',
-  'What is the structure of this ERP project?'
+  'How do I create a new sales order?',
+  'How do I approve a pending sales order?',
+  'How do I add a new customer?',
+  'How do I check inventory levels for an item?',
+  'How do I create a purchase order for raw materials?',
+  'What happens after a sales order is approved?',
+  'How do I record a customer payment?',
+  'How do I create a Bill of Materials (BOM)?',
 ]
 
 export default function HelpSupportPage() {
@@ -100,7 +103,7 @@ export default function HelpSupportPage() {
             ERP Help & Support Center
           </h1>
           <p className="text-sm text-slate-400">
-            Troubleshoot local deployments, configurations, or browse system documentation with our lightweight Support Desk.
+            Get help using the ERP platform — learn workflows, navigate features, and troubleshoot common issues.
           </p>
         </div>
 
@@ -118,7 +121,7 @@ export default function HelpSupportPage() {
                     </div>
                     <h3 className="font-semibold text-lg text-white">How can we help you today?</h3>
                     <p className="text-sm text-slate-400 max-w-sm mt-1">
-                      Ask about migrations, Vercel deployments, codebase layout, or basic troubleshooting steps.
+                      Ask about sales orders, inventory, work orders, invoices, or any ERP feature.
                     </p>
                   </div>
                 ) : null}
@@ -174,7 +177,7 @@ export default function HelpSupportPage() {
                 <Textarea
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
-                  placeholder="Ask a support question (e.g. How do I run setup-database.sql?)..."
+                  placeholder="Ask a question (e.g. How do I create a sales order?)..."
                   rows={2}
                   className="min-h-[50px] resize-none border-slate-800 bg-slate-950 text-slate-200 placeholder:text-slate-500 focus-visible:ring-indigo-500"
                   onKeyDown={(e) => {
