@@ -229,7 +229,7 @@ export interface Invoice {
   updatedAt: string
 }
 
-export interface Invoice Item {
+export interface InvoiceItem {
   id: string
   invoiceId: string
   productId?: string

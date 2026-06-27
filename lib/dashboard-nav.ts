@@ -10,6 +10,7 @@ import {
   Truck,
   Cog,
   Shield,
+  HelpCircle,
 } from 'lucide-react'
 
 export type NavChild = { name: string; href: string }
@@ -183,5 +184,11 @@ export const MAIN_NAV: NavItem[] = [
     href: '/dashboard/admin',
     icon: Shield,
     match: (p) => p.startsWith('/dashboard/admin'),
+  },
+  {
+    name: 'Help',
+    href: '/dashboard/help',
+    icon: HelpCircle,
+    match: (p) => p.startsWith('/dashboard/help'),
   },
 ]
