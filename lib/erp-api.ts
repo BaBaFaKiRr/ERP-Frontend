@@ -106,16 +106,18 @@ export async function erpFetch<T = unknown>(
 
   const url = `${getBaseUrl()}${path.startsWith('/') ? path : `/${path}`}`
   const isFormData = typeof FormData !== 'undefined' && init.body instanceof FormData
-  const normalizedBody =
+  const normalizedBody = (
     isFormData || init.body == null || typeof init.body === 'string'
       ? init.body
       : JSON.stringify(init.body)
+  ) as BodyInit | null
   const orgId = getActiveOrganizationId()
   const res = await fetch(url, {
     ...init,
     body: normalizedBody,
     headers: {
       Authorization: `Bearer ${accessToken}`,
+      'Bypass-Tunnel-Reminder': 'true',
       ...(orgId ? { 'X-Organization-Id': orgId } : {}),
       ...(isFormData ? {} : { 'Content-Type': 'application/json' }),
       ...(init.headers ?? {}),
@@ -143,6 +145,7 @@ async function getAuthHeaders(isFormData: boolean): Promise<HeadersInit> {
 
   return {
     Authorization: `Bearer ${accessToken}`,
+    'Bypass-Tunnel-Reminder': 'true',
     ...(getActiveOrganizationId() ? { 'X-Organization-Id': getActiveOrganizationId()! } : {}),
     ...(isFormData ? {} : { 'Content-Type': 'application/json' }),
   }
@@ -168,10 +171,11 @@ export async function erpFetchBlob(
   init: ErpFetchInit = {},
 ): Promise<{ blob: Blob; filename: string | null }> {
   const isFormData = typeof FormData !== 'undefined' && init.body instanceof FormData
-  const normalizedBody =
+  const normalizedBody = (
     isFormData || init.body == null || typeof init.body === 'string'
       ? init.body
       : JSON.stringify(init.body)
+  ) as BodyInit | null
   const url = `${getBaseUrl()}${path.startsWith('/') ? path : `/${path}`}`
   const res = await fetch(url, {
     ...init,

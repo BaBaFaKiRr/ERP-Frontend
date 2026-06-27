@@ -1,37 +1,13 @@
 import { createClient } from '@/lib/supabase/client'
-import type { PageContext } from '@/lib/page-context'
 
-export type AssistantSource = {
-  type: string
-  id: string
-  label?: string
-}
-
-export type AssistantLink = {
-  label: string
-  href: string
-}
-
-export type AssistantToolStep = {
-  tool: string
-  status: 'running' | 'done' | 'error'
-  summary?: string
-}
-
-export type AssistantChatResponse = {
+export type SupportChatResponse = {
   answer: string
-  sources: AssistantSource[]
-  links: AssistantLink[]
-  toolSteps: AssistantToolStep[]
-  usage?: { promptTokens: number; completionTokens: number }
 }
 
-export type ChatMessage = {
+export type SupportChatMessage = {
   id: string
   role: 'user' | 'assistant'
   content: string
-  links?: AssistantLink[]
-  toolSteps?: AssistantToolStep[]
   loading?: boolean
 }
 
@@ -56,13 +32,12 @@ async function getAuthHeaders(): Promise<HeadersInit> {
   }
 }
 
-export async function assistantChat(input: {
+export async function supportChat(input: {
   message: string
   history?: Array<{ role: 'user' | 'assistant'; content: string }>
-  pageContext?: PageContext
-}): Promise<AssistantChatResponse> {
+}): Promise<SupportChatResponse> {
   const headers = await getAuthHeaders()
-  const res = await fetch(`${getBaseUrl()}/api/assistant/chat`, {
+  const res = await fetch(`${getBaseUrl()}/api/support/chat`, {
     method: 'POST',
     headers,
     body: JSON.stringify(input),
@@ -72,27 +47,27 @@ export async function assistantChat(input: {
     const err = body as { error?: string }
     throw new Error(err.error ?? res.statusText)
   }
-  const data = (body as { data: AssistantChatResponse }).data
+  const data = (body as { data: SupportChatResponse }).data
   return data
 }
 
-export type StreamEvent =
+export type SupportStreamEvent =
   | { type: 'token'; content: string }
-  | { type: 'tool_start'; tool: string }
-  | { type: 'tool_done'; tool: string; summary?: string }
-  | { type: 'done'; answer: string; sources: AssistantSource[]; links: AssistantLink[]; toolSteps: AssistantToolStep[] }
+  | { type: 'done'; answer: string }
   | { type: 'error'; error: string }
 
-export async function assistantChatStream(
+export async function supportChatStream(
   input: {
     message: string
     history?: Array<{ role: 'user' | 'assistant'; content: string }>
-    pageContext?: PageContext
   },
-  onEvent: (event: StreamEvent) => void,
-): Promise<AssistantChatResponse> {
+  onEvent: (event: SupportStreamEvent) => void,
+): Promise<SupportChatResponse> {
   const headers = await getAuthHeaders()
-  const res = await fetch(`${getBaseUrl()}/api/assistant/chat/stream`, {
+  const res = await fetch(`${getBaseUrl()}/api/support/chat/stream`, {
+    // Wait, the backend prefix in routes/index.ts is /support, so the endpoint is /api/support/chat/stream
+    // Let's verify: apiRouter.use('/support', supportRouter)
+    // So the path is indeed /api/support/chat/stream!
     method: 'POST',
     headers,
     body: JSON.stringify(input),
@@ -109,7 +84,7 @@ export async function assistantChatStream(
 
   const decoder = new TextDecoder()
   let buffer = ''
-  let final: AssistantChatResponse | null = null
+  let final: SupportChatResponse | null = null
 
   while (true) {
     const { done, value } = await reader.read()
@@ -120,14 +95,11 @@ export async function assistantChatStream(
     for (const line of lines) {
       if (!line.startsWith('data: ')) continue
       try {
-        const event = JSON.parse(line.slice(6)) as StreamEvent
+        const event = JSON.parse(line.slice(6)) as SupportStreamEvent
         onEvent(event)
         if (event.type === 'done') {
           final = {
             answer: event.answer,
-            sources: event.sources,
-            links: event.links,
-            toolSteps: event.toolSteps,
           }
         }
         if (event.type === 'error') {

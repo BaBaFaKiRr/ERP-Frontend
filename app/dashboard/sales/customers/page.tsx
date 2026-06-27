@@ -17,8 +17,19 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { Input } from '@/components/ui/input'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import {
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationLink,
+  PaginationEllipsis,
+  PaginationNext,
+  PaginationPrevious,
+} from '@/components/ui/pagination'
 import { ArrowLeft, ArrowUpDown, EllipsisVertical, Filter, Plus, Search } from 'lucide-react'
 import { erpFetch } from '@/lib/erp-api'
+
+const PAGE_SIZE = 15
 
 type CustomerTypeFilter = 'all' | 'oem' | 'oe' | 'distributor' | 'export' | 'ecommerce' | 'retail'
 
@@ -84,6 +95,7 @@ export default function CustomersPage() {
   const [searchTerm, setSearchTerm] = useState('')
   const [typeFilter, setTypeFilter] = useState<CustomerTypeFilter>('all')
   const [sortBy, setSortBy] = useState<CustomerSortOption>('name_asc')
+  const [page, setPage] = useState(1)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -143,7 +155,32 @@ export default function CustomersPage() {
     return rows
   }, [customers, searchTerm, sortBy, typeFilter])
 
+  const totalPages = Math.max(1, Math.ceil(filteredCustomers.length / PAGE_SIZE))
+
+  const paginatedCustomers = useMemo(() => {
+    const start = (page - 1) * PAGE_SIZE
+    return filteredCustomers.slice(start, start + PAGE_SIZE)
+  }, [filteredCustomers, page])
+
+  useEffect(() => {
+    setPage(1)
+  }, [searchTerm, typeFilter, sortBy])
+
+  useEffect(() => {
+    if (page > totalPages) setPage(totalPages)
+  }, [page, totalPages])
+
   const filterActive = typeFilter !== 'all'
+  const rangeStart = filteredCustomers.length === 0 ? 0 : (page - 1) * PAGE_SIZE + 1
+  const rangeEnd = Math.min(page * PAGE_SIZE, filteredCustomers.length)
+
+  const pageNumbers = useMemo(() => {
+    if (totalPages <= 7) {
+      return Array.from({ length: totalPages }, (_, i) => i + 1)
+    }
+    const pages = new Set<number>([1, totalPages, page, page - 1, page + 1])
+    return [...pages].filter((p) => p >= 1 && p <= totalPages).sort((a, b) => a - b)
+  }, [page, totalPages])
 
   return (
     <div className="p-8">
@@ -190,7 +227,9 @@ export default function CustomersPage() {
             Search, filter, and sort all customers
             {!loading && (
               <span className="mt-1 block text-xs text-muted-foreground">
-                Showing {filteredCustomers.length} of {customers.length} customers
+                {filteredCustomers.length === 0
+                  ? `Showing 0 of ${customers.length} customers`
+                  : `Showing ${rangeStart}–${rangeEnd} of ${filteredCustomers.length} customers${filteredCustomers.length !== customers.length ? ` (${customers.length} total)` : ''}`}
                 {searchTerm.trim() ? ` · matching “${searchTerm.trim()}”` : ''}
                 {filterActive ? ` · ${TYPE_FILTER_LABEL[typeFilter]}` : ''}
               </span>
@@ -287,7 +326,7 @@ export default function CustomersPage() {
                     <TableCell colSpan={7}>No customers found.</TableCell>
                   </TableRow>
                 ) : (
-                  filteredCustomers.map((customer) => (
+                  paginatedCustomers.map((customer) => (
                     <TableRow
                       key={customer.id}
                       className="cursor-pointer text-gray-800 hover:bg-gray-50 dark:text-slate-200 dark:hover:bg-slate-800/40"
@@ -311,6 +350,63 @@ export default function CustomersPage() {
               </TableBody>
             </Table>
           </div>
+
+          {!loading && filteredCustomers.length > 0 ? (
+            <div className="mt-6 flex flex-col items-center gap-3 sm:flex-row sm:justify-between">
+              <p className="text-sm text-muted-foreground">
+                Page {page} of {totalPages}
+              </p>
+              <Pagination className="mx-0 w-auto justify-end">
+                <PaginationContent>
+                  <PaginationItem>
+                    <PaginationPrevious
+                      href="#"
+                      onClick={(e) => {
+                        e.preventDefault()
+                        setPage((p) => Math.max(1, p - 1))
+                      }}
+                      className={page <= 1 ? 'pointer-events-none opacity-50' : undefined}
+                    />
+                  </PaginationItem>
+                  {pageNumbers.map((pageNum, index) => {
+                    const prev = pageNumbers[index - 1]
+                    const showEllipsisBefore = prev != null && pageNum - prev > 1
+                    return (
+                      <span key={pageNum} className="contents">
+                        {showEllipsisBefore ? (
+                          <PaginationItem>
+                            <PaginationEllipsis />
+                          </PaginationItem>
+                        ) : null}
+                        <PaginationItem>
+                          <PaginationLink
+                            href="#"
+                            isActive={pageNum === page}
+                            onClick={(e) => {
+                              e.preventDefault()
+                              setPage(pageNum)
+                            }}
+                          >
+                            {pageNum}
+                          </PaginationLink>
+                        </PaginationItem>
+                      </span>
+                    )
+                  })}
+                  <PaginationItem>
+                    <PaginationNext
+                      href="#"
+                      onClick={(e) => {
+                        e.preventDefault()
+                        setPage((p) => Math.min(totalPages, p + 1))
+                      }}
+                      className={page >= totalPages ? 'pointer-events-none opacity-50' : undefined}
+                    />
+                  </PaginationItem>
+                </PaginationContent>
+              </Pagination>
+            </div>
+          ) : null}
         </CardContent>
       </Card>
     </div>
