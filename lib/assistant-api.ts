@@ -60,6 +60,7 @@ export async function assistantChat(input: {
   message: string
   history?: Array<{ role: 'user' | 'assistant'; content: string }>
   pageContext?: PageContext
+  model?: string
 }): Promise<AssistantChatResponse> {
   const headers = await getAuthHeaders()
   const res = await fetch(`${getBaseUrl()}/api/assistant/chat`, {
@@ -88,6 +89,7 @@ export async function assistantChatStream(
     message: string
     history?: Array<{ role: 'user' | 'assistant'; content: string }>
     pageContext?: PageContext
+    model?: string
   },
   onEvent: (event: StreamEvent) => void,
 ): Promise<AssistantChatResponse> {
