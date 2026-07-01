@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Checkbox } from '@/components/ui/checkbox'
+import { Label } from '@/components/ui/label'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 
@@ -19,12 +20,21 @@ type DispatchOrderDetail = {
   sales_order_id: string
   sales_order_number?: string | null
   sales_order_status?: string | null
+  customer_id?: string | null
   customer_name?: string | null
   status: string
   generated_by_name?: string | null
   rejected_by_name?: string | null
   created_at: string
   order_date?: string | null
+  customers?: {
+    id: string
+    name?: string | null
+    gst_number?: string | null
+    pan?: string | null
+    state?: string | null
+    customer_type?: string | null
+  } | null
   sales_orders?: {
     po_number?: string | null
   } | null
@@ -60,6 +70,16 @@ type DispatchSalesInvoice = {
   created_at: string
 }
 
+type GstTransactionType = 'b2b' | 'b2c' | 'export' | 'sez'
+
+const B2C_PAN_THRESHOLD = 200_000
+const GST_TYPE_LABEL: Record<GstTransactionType, string> = {
+  b2b: 'B2B',
+  b2c: 'B2C',
+  export: 'Export',
+  sez: 'SEZ',
+}
+
 function statusLabel(status: string): string {
   if (status === 'rejected_by_admin') return 'Rejected by Admin'
   if (status === 'waiting_to_dispatch') return 'Waiting To Dispatch'
@@ -93,6 +113,12 @@ export default function InvoiceRequestDetailPage() {
   const [termsProfileId, setTermsProfileId] = useState('')
   const [bankProfileId, setBankProfileId] = useState('')
   const [companyProfileId, setCompanyProfileId] = useState('')
+  const [gstTransactionType, setGstTransactionType] = useState<GstTransactionType>('b2b')
+  const [customerGstin, setCustomerGstin] = useState('')
+  const [customerPan, setCustomerPan] = useState('')
+  const [saveCustomerGst, setSaveCustomerGst] = useState(false)
+  const [saveCustomerPan, setSaveCustomerPan] = useState(false)
+  const [supplyType, setSupplyType] = useState<'intrastate' | 'interstate'>('intrastate')
   const [invoices, setInvoices] = useState<DispatchSalesInvoice[]>([])
   const [me, setMe] = useState<{ role: string } | null>(null)
   const [approvalBusy, setApprovalBusy] = useState(false)
@@ -152,8 +178,34 @@ export default function InvoiceRequestDetailPage() {
     (sum, line) => sum + Number(line.qty_to_dispatch ?? 0) * Number(line.unit_price_edit || 0),
     0,
   )
-  const gstAmount = Math.round(subTotal * 0.18 * 100) / 100
+  const gstExempt = gstTransactionType === 'export' || gstTransactionType === 'sez'
+  const cgstAmount = gstExempt || supplyType === 'interstate' ? 0 : Math.round(subTotal * 0.09 * 100) / 100
+  const sgstAmount = gstExempt || supplyType === 'interstate' ? 0 : Math.round(subTotal * 0.09 * 100) / 100
+  const igstAmount = gstExempt || supplyType === 'intrastate' ? 0 : Math.round(subTotal * 0.18 * 100) / 100
+  const gstAmount = cgstAmount + sgstAmount + igstAmount
   const grandTotal = Math.round((subTotal + gstAmount) * 100) / 100
+  const panRequired = gstTransactionType === 'b2c' && subTotal >= B2C_PAN_THRESHOLD
+
+  const refreshSupplyType = async (customerState?: string | null, gstin?: string, companyGstin?: string) => {
+    try {
+      const params = new URLSearchParams()
+      if (customerState) params.set('customer_state', customerState)
+      const effectiveGstin = gstin || data?.customers?.gst_number || ''
+      if (effectiveGstin) params.set('customer_gstin', effectiveGstin)
+      if (companyGstin) params.set('company_gstin', companyGstin)
+      const res = await erpFetch<{ data: { supply_type: 'intrastate' | 'interstate' } }>(
+        `/api/gst/supply-preview?${params.toString()}`,
+      )
+      setSupplyType(res.data?.supply_type ?? 'intrastate')
+    } catch {
+      setSupplyType('intrastate')
+    }
+  }
+
+  useEffect(() => {
+    if (!data?.customers) return
+    void refreshSupplyType(data.customers.state, customerGstin || data.customers.gst_number || undefined)
+  }, [data?.customers, customerGstin])
 
   const openProformaPreview = async () => {
     if (!data?.sales_order_id) return
@@ -227,6 +279,18 @@ export default function InvoiceRequestDetailPage() {
       setTermsProfileId((terms.find((p) => p.is_default) ?? terms[0]).id)
       setBankProfileId((banks.find((p) => p.is_default) ?? banks[0]).id)
       setCompanyProfileId((companies.find((p) => p.is_default) ?? companies[0]).id)
+      const customer = data?.customers ?? null
+      const inferredType: GstTransactionType =
+        customer?.customer_type === 'export'
+          ? 'export'
+          : customer?.gst_number
+            ? 'b2b'
+            : 'b2c'
+      setGstTransactionType(inferredType)
+      setCustomerGstin(customer?.gst_number ?? '')
+      setCustomerPan(customer?.pan ?? '')
+      setSaveCustomerGst(false)
+      setSaveCustomerPan(false)
       setSettingsOpen(true)
     } catch (e) {
       alert(e instanceof Error ? e.message : 'Failed to run sales invoice pre-check')
@@ -241,6 +305,14 @@ export default function InvoiceRequestDetailPage() {
       alert('Please select Terms, Bank, and Company profiles.')
       return
     }
+    if (gstTransactionType === 'b2b' && !customerGstin.trim()) {
+      alert('Customer GSTIN is required for B2B invoices.')
+      return
+    }
+    if (panRequired && !customerPan.trim()) {
+      alert(`Customer PAN is required for B2C invoices with taxable value ≥ ₹${B2C_PAN_THRESHOLD.toLocaleString('en-IN')}.`)
+      return
+    }
     setSalesInvoiceLoading(true)
     try {
       const createRes = await erpFetch<{ data: { id: string; invoice_number: string } }>(
@@ -252,6 +324,11 @@ export default function InvoiceRequestDetailPage() {
             terms_profile_id: termsProfileId,
             bank_profile_id: bankProfileId,
             company_profile_id: companyProfileId,
+            gst_transaction_type: gstTransactionType,
+            customer_gstin: customerGstin.trim() || null,
+            customer_pan: customerPan.trim() || null,
+            save_customer_gst: saveCustomerGst,
+            save_customer_pan: saveCustomerPan,
             lines: selectedLines.map((line) => ({
               dispatch_order_line_id: line.id,
               unit_price: Number(line.unit_price_edit || 0),
@@ -561,9 +638,35 @@ export default function InvoiceRequestDetailPage() {
                         <td className="py-2 pr-3">₹{subTotal.toFixed(2)}</td>
                       </tr>
                       <tr className="bg-muted/20 font-medium">
-                        <td colSpan={7} className="py-2 pr-3 text-right">GST (18%)</td>
-                        <td className="py-2 pr-3">₹{gstAmount.toFixed(2)}</td>
+                        <td colSpan={7} className="py-2 pr-3 text-right">
+                          {gstExempt
+                            ? 'GST (exempt)'
+                            : supplyType === 'interstate'
+                              ? 'IGST (18%)'
+                              : 'CGST (9%) + SGST (9%)'}
+                        </td>
+                        <td className="py-2 pr-3">
+                          {gstExempt ? (
+                            '₹0.00'
+                          ) : supplyType === 'interstate' ? (
+                            `₹${igstAmount.toFixed(2)}`
+                          ) : (
+                            `₹${(cgstAmount + sgstAmount).toFixed(2)}`
+                          )}
+                        </td>
                       </tr>
+                      {!gstExempt && supplyType === 'intrastate' ? (
+                        <>
+                          <tr className="bg-muted/10 text-sm">
+                            <td colSpan={7} className="py-1 pr-3 text-right text-muted-foreground">CGST @ 9%</td>
+                            <td className="py-1 pr-3">₹{cgstAmount.toFixed(2)}</td>
+                          </tr>
+                          <tr className="bg-muted/10 text-sm">
+                            <td colSpan={7} className="py-1 pr-3 text-right text-muted-foreground">SGST @ 9%</td>
+                            <td className="py-1 pr-3">₹{sgstAmount.toFixed(2)}</td>
+                          </tr>
+                        </>
+                      ) : null}
                       <tr className="bg-muted/30 font-semibold">
                         <td colSpan={7} className="py-2 pr-3 text-right">Grand Total</td>
                         <td className="py-2 pr-3">₹{grandTotal.toFixed(2)}</td>
@@ -643,6 +746,84 @@ export default function InvoiceRequestDetailPage() {
                 <DialogTitle>Select Invoice Settings Profiles</DialogTitle>
               </DialogHeader>
               <div className="space-y-4 py-2">
+                <div>
+                  <p className="text-sm font-medium mb-1">GST Transaction Type</p>
+                  <Select
+                    value={gstTransactionType}
+                    onValueChange={(v: GstTransactionType) => setGstTransactionType(v)}
+                  >
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {(Object.keys(GST_TYPE_LABEL) as GstTransactionType[]).map((key) => (
+                        <SelectItem key={key} value={key}>{GST_TYPE_LABEL[key]}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {gstExempt ? (
+                    <p className="text-xs text-muted-foreground mt-1">No GST will be charged on this invoice.</p>
+                  ) : (
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {supplyType === 'interstate'
+                        ? 'Inter-state supply — IGST @ 18% will apply.'
+                        : 'Intra-state supply — CGST @ 9% + SGST @ 9% will apply.'}
+                    </p>
+                  )}
+                </div>
+
+                {gstTransactionType === 'b2b' ? (
+                  <div className="space-y-2">
+                    <div>
+                      <Label htmlFor="customer-gstin">Customer GSTIN *</Label>
+                      <Input
+                        id="customer-gstin"
+                        value={customerGstin}
+                        onChange={(e) => {
+                          setCustomerGstin(e.target.value.toUpperCase())
+                          void refreshSupplyType(data?.customers?.state, e.target.value.toUpperCase())
+                        }}
+                        placeholder="15-character GSTIN"
+                      />
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Checkbox
+                        id="save-gst"
+                        checked={saveCustomerGst}
+                        onCheckedChange={(v) => setSaveCustomerGst(Boolean(v))}
+                      />
+                      <Label htmlFor="save-gst" className="text-sm font-normal">
+                        Save GSTIN to customer profile
+                      </Label>
+                    </div>
+                  </div>
+                ) : null}
+
+                {gstTransactionType === 'b2c' && panRequired ? (
+                  <div className="space-y-2">
+                    <div>
+                      <Label htmlFor="customer-pan">Customer PAN *</Label>
+                      <Input
+                        id="customer-pan"
+                        value={customerPan}
+                        onChange={(e) => setCustomerPan(e.target.value.toUpperCase())}
+                        placeholder="10-character PAN"
+                      />
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Required because invoice taxable value is ≥ ₹{B2C_PAN_THRESHOLD.toLocaleString('en-IN')}.
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Checkbox
+                        id="save-pan"
+                        checked={saveCustomerPan}
+                        onCheckedChange={(v) => setSaveCustomerPan(Boolean(v))}
+                      />
+                      <Label htmlFor="save-pan" className="text-sm font-normal">
+                        Save PAN to customer profile
+                      </Label>
+                    </div>
+                  </div>
+                ) : null}
+
                 <div>
                   <p className="text-sm font-medium mb-1">Terms & Conditions</p>
                   <Select value={termsProfileId} onValueChange={setTermsProfileId}>

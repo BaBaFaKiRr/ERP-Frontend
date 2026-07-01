@@ -45,6 +45,7 @@ export const MANUFACTURING_CHILDREN: NavChild[] = [
 
 export const ACCOUNTS_CHILDREN: NavChild[] = [
   { name: 'Overview', href: '/dashboard/finance' },
+  { name: 'GST', href: '/dashboard/finance/gst' },
   { name: 'Invoice Requests', href: '/dashboard/finance/invoice-requests' },
   { name: 'Sales Invoices', href: '/dashboard/finance/sales-invoices' },
   { name: 'Purchase Invoices', href: '/dashboard/finance/purchase-invoices' },

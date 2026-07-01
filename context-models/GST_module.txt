@@ -1,0 +1,57 @@
+The GST module is the Goods and Service Tax module.
+Add a GST page under Accounts tab on left navbar. On this page, we add widgets for the total GST collected
+in all invoices issued in the current Financial year (April 1-March 31). 
+Under this, add buttons: GSTR-1 and GSTR-3B, where GSTR-1 is GST collected by us from all sales and GSTR-3B is
+GST paid by us and collected by sellers.
+
+On GSTR-1 page, give option to user to generate report for an entered time period based on different categories (page layout image attached for reference):
+1) HSN wise division. 
+A GST is calculated based on the HSN category of an item. For a sales invoice generated, there can be multiple items
+having different HSN codes and falling in different tax categories. Thus we collect different tax percentages.
+To file the GST at the end of a GST closing period, a business requires the breakup of the items sold grouped by
+their HSN code.
+For eg, if a company sells:
+Item, HSN, Price, Qty
+A, 123, 100, 100
+B, 122, 120, 102
+C, 123, 122, 100
+
+Then, the HSN wise GST summary for this period will have:
+HSN: 123
+Item, HSN, Qty, Price
+A, 123, 100, 100
+C, 123, 100, 122
+
+HSN: 122
+Item, HSN, Qty, Price
+B, 122, 102, 120
+
+2) Export:
+For all invoices generated for export (We do not charge gst on export)
+
+3) B2B:
+For all B2B customers
+
+4) B2C:
+For all B2C customers
+
+5) Debit/Credit Notes:
+Summary of all reverse charges incurred due to issueance of debit/credit Notes
+
+Also, to incorporate these changes, implement selecting Export, B2B, B2C, SEZ transaction type before creating a sales
+invoice. 
+
+In this change, if the user chooses:
+1) B2B: We require GST details of the customer. If we have them on file, fill them in 
+else, ask user for the GST details and also give option to save them to customer profile for future
+
+2) B2C: If the total value of the invoice, before taxes, is below 2lac rupees, we do not require the PAN card of customer
+but otherwise, we require the PAN Card of the customer. If the PAN is present in customer profile, use it. Else, ask the user
+for the customer's PAN card details and give option to store for future use.
+
+3) Export: We do not charge GST on export orders
+
+4) SEZ: We do not charge GST on SEZ transactions. 
+
+Now, make all necessary changes to implement this and also confirm that you have access to my supabase and directly push
+any db migrations into the supabase.
