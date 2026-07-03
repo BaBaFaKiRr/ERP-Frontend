@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { Bot, Loader2, PanelRightClose, Send, Sparkles } from 'lucide-react'
+import { Bot, Loader2, PanelRightClose, Send, Sparkles, Settings } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { ScrollArea } from '@/components/ui/scroll-area'
@@ -14,6 +14,28 @@ import {
   type ChatMessage,
   type StreamEvent,
 } from '@/lib/assistant-api'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+
+const MODELS = [
+  { id: 'deepseek-chat', name: 'DeepSeek Chat' },
+  { id: 'gpt-4o', name: 'GPT-4o' },
+  { id: 'claude-3-5-sonnet', name: 'Claude 3.5 Sonnet' },
+  { id: 'meta-llama/llama-3-8b-instruct', name: 'Llama 3 8B' },
+  { id: 'gemini-1.5-pro', name: 'Gemini 1.5 Pro' },
+]
 
 type AssistantPanelProps = {
   onClose: () => void
@@ -33,6 +55,8 @@ export function AssistantPanel({ onClose }: AssistantPanelProps) {
   const [busy, setBusy] = useState(false)
   const [toolStatus, setToolStatus] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [selectedModel, setSelectedModel] = useState<string>('deepseek-chat')
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false)
   const bottomRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -66,7 +90,7 @@ export function AssistantPanel({ onClose }: AssistantPanelProps) {
 
       try {
         const result = await assistantChatStream(
-          { message: trimmed, history, pageContext },
+          { message: trimmed, history, pageContext, model: selectedModel },
           (event: StreamEvent) => {
             if (event.type === 'tool_start') {
               setToolStatus(`Fetching ${formatToolName(event.tool)}…`)
@@ -126,7 +150,7 @@ export function AssistantPanel({ onClose }: AssistantPanelProps) {
         setToolStatus(null)
       }
     },
-    [busy, messages, pageContext],
+    [busy, messages, pageContext, selectedModel],
   )
 
   return (
@@ -138,19 +162,31 @@ export function AssistantPanel({ onClose }: AssistantPanelProps) {
             LEJER Assistant
           </div>
           <p className="mt-0.5 text-xs text-muted-foreground">
-            Read-only — cannot create or approve documents.
+            {MODELS.find((m) => m.id === selectedModel)?.name || selectedModel} • Read-only
           </p>
         </div>
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon"
-          className="h-8 w-8 shrink-0 rounded-lg"
-          onClick={onClose}
-          aria-label="Close assistant panel"
-        >
-          <PanelRightClose className="h-4 w-4" />
-        </Button>
+        <div className="flex items-center gap-1 shrink-0">
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8 rounded-lg"
+            onClick={() => setIsSettingsOpen(true)}
+            aria-label="Assistant settings"
+          >
+            <Settings className="h-4 w-4" />
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8 rounded-lg"
+            onClick={onClose}
+            aria-label="Close assistant panel"
+          >
+            <PanelRightClose className="h-4 w-4" />
+          </Button>
+        </div>
       </div>
 
       <ScrollArea className="min-h-0 flex-1 px-3">
@@ -270,6 +306,36 @@ export function AssistantPanel({ onClose }: AssistantPanelProps) {
           </Button>
         </div>
       </div>
+
+      <Dialog open={isSettingsOpen} onOpenChange={setIsSettingsOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Assistant Settings</DialogTitle>
+            <DialogDescription>
+              Choose which AI model you want the assistant to use. Providers and keys are configured via environment variables.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid gap-2">
+              <label htmlFor="model-select" className="text-sm font-medium">
+                Active AI Model
+              </label>
+              <Select value={selectedModel} onValueChange={setSelectedModel}>
+                <SelectTrigger id="model-select" className="w-full">
+                  <SelectValue placeholder="Select a model" />
+                </SelectTrigger>
+                <SelectContent>
+                  {MODELS.map((model) => (
+                    <SelectItem key={model.id} value={model.id}>
+                      {model.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
