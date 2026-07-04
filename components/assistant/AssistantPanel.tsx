@@ -34,7 +34,7 @@ const MODELS = [
   { id: 'openai/gpt-4o', name: 'GPT-4o' },
   { id: 'anthropic/claude-3.5-sonnet', name: 'Claude 3.5 Sonnet' },
   { id: 'meta-llama/llama-3-8b-instruct', name: 'Llama 3 8B' },
-  { id: 'google/gemini-pro-1.5', name: 'Gemini 1.5 Pro' },
+  { id: 'google/gemini-1.5-pro', name: 'Gemini 1.5 Pro' },
 ]
 
 type AssistantPanelProps = {
