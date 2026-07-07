@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { ArrowLeft, RotateCcw } from 'lucide-react'
 import { useOrganization } from '@/lib/organization-context'
 import {
@@ -55,6 +55,8 @@ function userLabel(u: PermissionUserRow) {
 
 export default function AdminPermissionsPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const fromSettings = searchParams.get('from') === 'settings'
   const { membershipRole, moduleRoles, loading: orgLoading } = useOrganization()
 
   const isOrgAdmin = useMemo(() => {
@@ -199,11 +201,11 @@ export default function AdminPermissionsPage() {
     <div className="flex min-h-0 flex-1 flex-col">
       <div className="border-b bg-background px-8 py-6">
         <Link
-          href="/dashboard/admin"
+          href={fromSettings ? '/dashboard/settings' : '/dashboard/admin'}
           className="mb-4 inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground"
         >
           <ArrowLeft className="h-4 w-4" />
-          Admin
+          {fromSettings ? 'Settings' : 'Admin'}
         </Link>
         <h1 className="text-3xl font-bold tracking-tight">Permissions</h1>
         <p className="mt-1 text-muted-foreground">

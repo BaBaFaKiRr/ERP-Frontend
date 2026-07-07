@@ -105,6 +105,7 @@ function formatWhen(iso: string) {
 function ImportExportPageContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
+  const fromParam = searchParams.get('from')
   const segmentParam = searchParams.get('segment')
   const initialSegment: DataSegment =
     segmentParam === 'customers'
@@ -195,7 +196,9 @@ function ImportExportPageContent() {
     setImportFile(null)
     setError(null)
     setMessage(null)
-    router.replace(`/dashboard/import-export?segment=${next}`)
+    router.replace(
+      `/dashboard/import-export?segment=${next}${fromParam === 'settings' ? '&from=settings' : ''}`,
+    )
   }
 
   const downloadSample = async () => {
@@ -278,11 +281,15 @@ function ImportExportPageContent() {
   }
 
   const backHref =
-    segment === 'items'
-      ? '/dashboard/inventory/items'
-      : segment === 'suppliers'
-        ? '/dashboard/purchase/suppliers'
-        : '/dashboard/sales/create'
+    fromParam === 'settings'
+      ? '/dashboard/settings'
+      : segment === 'items'
+        ? '/dashboard/inventory/items'
+        : segment === 'suppliers'
+          ? '/dashboard/purchase/suppliers'
+          : '/dashboard/sales/create'
+
+  const backLabel = fromParam === 'settings' ? 'Back to Settings' : 'Back'
 
   return (
     <div className="p-8 max-w-4xl space-y-6">
@@ -290,7 +297,7 @@ function ImportExportPageContent() {
         <Button variant="ghost" size="sm" asChild className="gap-2">
           <Link href={backHref}>
             <ArrowLeft size={18} />
-            Back
+            {backLabel}
           </Link>
         </Button>
         <div>

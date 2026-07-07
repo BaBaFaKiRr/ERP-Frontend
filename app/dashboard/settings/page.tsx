@@ -45,7 +45,7 @@ const MODULE_LINKS: SettingsLink[] = [
   {
     title: 'Import / Export',
     description: 'Bulk import and export for suppliers, customers, and items',
-    href: '/dashboard/import-export',
+    href: '/dashboard/import-export?from=settings',
     icon: Database,
   },
 ]
@@ -215,7 +215,7 @@ export default function SettingsPage() {
             </CardHeader>
             <CardContent className="mt-auto">
               <Button variant="outline" className="w-full" asChild>
-                <Link href="/dashboard/admin">
+                <Link href="/dashboard/admin?from=settings">
                   Admin panel
                   <ArrowRight className="ml-2 size-4" />
                 </Link>

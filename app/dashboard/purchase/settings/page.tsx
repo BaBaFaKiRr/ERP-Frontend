@@ -1,8 +1,18 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
-import { Pencil, Plus, Star, Trash2 } from 'lucide-react'
+import { Plus } from 'lucide-react'
 import { erpFetch } from '@/lib/erp-api'
+import {
+  ProfileDetailDialog,
+  type ProfileDetailContent,
+} from '@/components/settings/profile-detail-dialog'
+import { SavedProfileRow } from '@/components/settings/saved-profile-row'
+import { SettingsPageShell } from '@/components/settings/settings-page-shell'
+import {
+  SettingsSectionGrid,
+  SettingsSplitLayout,
+} from '@/components/settings/settings-split-layout'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -39,6 +49,7 @@ export default function PurchaseSettingsPage() {
   const [billingEditingId, setBillingEditingId] = useState<string | null>(null)
   const [billingAlias, setBillingAlias] = useState('')
   const [billingAddress, setBillingAddress] = useState('')
+  const [viewingProfile, setViewingProfile] = useState<ProfileDetailContent | null>(null)
 
   const hasDefault = useMemo(() => rows.some((row) => row.is_default), [rows])
   const hasDeliveryDefault = useMemo(() => deliveryRows.some((row) => row.is_default), [deliveryRows])
@@ -208,134 +219,173 @@ export default function PurchaseSettingsPage() {
     }
   }
 
+  const viewTermsProfile = (row: PurchaseTermsProfile) => {
+    setViewingProfile({
+      title: row.alias,
+      isDefault: row.is_default,
+      textContent: {
+        label: 'Terms & Conditions',
+        value: row.terms_text,
+      },
+    })
+  }
+
+  const viewAddressProfile = (row: PurchaseAddressProfile, label: string) => {
+    setViewingProfile({
+      title: row.alias,
+      isDefault: row.is_default,
+      textContent: {
+        label,
+        value: row.address_text,
+      },
+    })
+  }
+
   return (
-    <div className="p-8 space-y-6">
-      <Card>
-        <CardHeader>
-          <CardTitle>Purchase Settings</CardTitle>
-          <CardDescription>Create Terms & Conditions profiles for Purchase Orders</CardDescription>
-        </CardHeader>
-      </Card>
-
-      {loading && <p className="text-sm text-muted-foreground">Loading profiles...</p>}
-      {error && <p className="text-sm text-red-600">{error}</p>}
-
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <div>
-              <CardTitle>{editingId ? 'Edit terms profile' : 'Create terms profile'}</CardTitle>
-            </div>
-            <Button variant="outline" onClick={resetForm}>
-              <Plus className="mr-2 size-4" />
-              New
-            </Button>
-          </div>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          <Input
-            placeholder="Alias (e.g. Standard Raw Material PO Terms)"
-            value={alias}
-            onChange={(e) => setAlias(e.target.value)}
-          />
-          <Textarea
-            rows={8}
-            placeholder="Enter Terms and Conditions text..."
-            value={termsText}
-            onChange={(e) => setTermsText(e.target.value)}
-          />
-          <div className="flex gap-2">
-            <Button onClick={() => void save()} disabled={saving}>
-              {saving ? 'Saving...' : editingId ? 'Update Profile' : 'Create Profile'}
-            </Button>
-            <Button variant="outline" onClick={resetForm}>
-              Clear
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Saved Terms Profiles</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-2">
-          {rows.length === 0 ? <p className="text-sm text-muted-foreground">No terms profiles created yet.</p> : null}
-          {rows.map((row) => (
-            <div key={row.id} className="rounded-md border p-3">
-              <div className="mb-2 flex items-center justify-between gap-2">
-                <div>
-                  <p className="font-medium">{row.alias}</p>
-                  <p className="text-xs text-muted-foreground">{row.is_default ? 'Default profile' : 'Not default'}</p>
-                </div>
-                <div className="flex items-center gap-2">
-                  {!row.is_default ? (
-                    <Button variant="outline" size="sm" onClick={() => void setDefault(row.id)}>
-                      <Star className="mr-1 size-4" />
-                      Set Default
-                    </Button>
-                  ) : (
-                    <Button variant="secondary" size="sm" disabled>
-                      <Star className="mr-1 size-4" />
-                      Default
-                    </Button>
-                  )}
-                  <Button variant="outline" size="sm" onClick={() => startEdit(row)}>
-                    <Pencil className="mr-1 size-4" />
-                    Edit
-                  </Button>
-                  <Button variant="destructive" size="sm" onClick={() => void remove(row.id)}>
-                    <Trash2 className="mr-1 size-4" />
-                    Delete
+    <SettingsPageShell
+      title="Purchase Settings"
+      description="Manage reusable terms and address profiles for purchase orders."
+      backLink={{ href: '/dashboard/settings', label: 'Back to Settings' }}
+      status={
+        <>
+          {loading ? <p className="text-sm text-muted-foreground">Loading profiles...</p> : null}
+          {error ? <p className="text-sm text-red-600">{error}</p> : null}
+        </>
+      }
+    >
+      <section className="space-y-4">
+        <div>
+          <h2 className="text-lg font-semibold">Terms & Conditions</h2>
+          <p className="text-sm text-muted-foreground">Profiles used on purchase order documents.</p>
+        </div>
+        <SettingsSplitLayout
+          editor={
+            <Card className="h-full">
+              <CardHeader>
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <CardTitle className="text-base">
+                      {editingId ? 'Edit terms profile' : 'Create terms profile'}
+                    </CardTitle>
+                  </div>
+                  <Button variant="outline" size="sm" onClick={resetForm}>
+                    <Plus className="mr-2 size-4" />
+                    New
                   </Button>
                 </div>
-              </div>
-              <div className="whitespace-pre-wrap rounded border bg-muted/20 p-2 text-sm">{row.terms_text}</div>
-            </div>
-          ))}
-        </CardContent>
-      </Card>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <Input
+                  placeholder="Alias (e.g. Standard Raw Material PO Terms)"
+                  value={alias}
+                  onChange={(e) => setAlias(e.target.value)}
+                />
+                <Textarea
+                  rows={8}
+                  placeholder="Enter Terms and Conditions text..."
+                  value={termsText}
+                  onChange={(e) => setTermsText(e.target.value)}
+                />
+                <div className="flex flex-wrap gap-2">
+                  <Button onClick={() => void save()} disabled={saving}>
+                    {saving ? 'Saving...' : editingId ? 'Update Profile' : 'Create Profile'}
+                  </Button>
+                  <Button variant="outline" onClick={resetForm}>
+                    Clear
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          }
+          list={
+            <Card className="h-full">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base">Saved Terms Profiles</CardTitle>
+                <CardDescription>
+                  {rows.length === 0
+                    ? 'No terms profiles created yet.'
+                    : `${rows.length} profile${rows.length === 1 ? '' : 's'}`}
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="max-h-[min(70vh,640px)] space-y-2 overflow-y-auto">
+                {rows.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">Create your first terms profile using the form.</p>
+                ) : null}
+                {rows.map((row) => (
+                  <SavedProfileRow
+                    key={row.id}
+                    alias={row.alias}
+                    isDefault={row.is_default}
+                    onView={() => viewTermsProfile(row)}
+                    onEdit={() => startEdit(row)}
+                    onDelete={() => void remove(row.id)}
+                    onSetDefault={() => void setDefault(row.id)}
+                  />
+                ))}
+              </CardContent>
+            </Card>
+          }
+        />
+      </section>
 
-      <AddressSettingsSection
-        title="Delivery Address Profiles"
-        rows={deliveryRows}
-        alias={deliveryAlias}
-        addressText={deliveryAddress}
-        editingId={deliveryEditingId}
-        saving={saving}
-        onAliasChange={setDeliveryAlias}
-        onAddressChange={setDeliveryAddress}
-        onSave={() => void saveAddress('delivery')}
-        onClear={resetDeliveryForm}
-        onEdit={(row) => {
-          setDeliveryEditingId(row.id)
-          setDeliveryAlias(row.alias)
-          setDeliveryAddress(row.address_text)
-        }}
-        onSetDefault={(id) => void setDefaultAddress(id)}
-        onDelete={(id) => void removeAddress(id)}
-      />
+      <section className="space-y-4">
+        <div>
+          <h2 className="text-lg font-semibold">Address Profiles</h2>
+          <p className="text-sm text-muted-foreground">Delivery and billing addresses for purchase orders.</p>
+        </div>
+        <SettingsSectionGrid columns={2}>
+          <AddressSettingsSection
+            title="Delivery Address Profiles"
+            rows={deliveryRows}
+            alias={deliveryAlias}
+            addressText={deliveryAddress}
+            editingId={deliveryEditingId}
+            saving={saving}
+            onAliasChange={setDeliveryAlias}
+            onAddressChange={setDeliveryAddress}
+            onSave={() => void saveAddress('delivery')}
+            onClear={resetDeliveryForm}
+            onEdit={(row) => {
+              setDeliveryEditingId(row.id)
+              setDeliveryAlias(row.alias)
+              setDeliveryAddress(row.address_text)
+            }}
+            onView={(row) => viewAddressProfile(row, 'Delivery Address')}
+            onSetDefault={(id) => void setDefaultAddress(id)}
+            onDelete={(id) => void removeAddress(id)}
+          />
 
-      <AddressSettingsSection
-        title="Billing Address Profiles"
-        rows={billingRows}
-        alias={billingAlias}
-        addressText={billingAddress}
-        editingId={billingEditingId}
-        saving={saving}
-        onAliasChange={setBillingAlias}
-        onAddressChange={setBillingAddress}
-        onSave={() => void saveAddress('billing')}
-        onClear={resetBillingForm}
-        onEdit={(row) => {
-          setBillingEditingId(row.id)
-          setBillingAlias(row.alias)
-          setBillingAddress(row.address_text)
+          <AddressSettingsSection
+            title="Billing Address Profiles"
+            rows={billingRows}
+            alias={billingAlias}
+            addressText={billingAddress}
+            editingId={billingEditingId}
+            saving={saving}
+            onAliasChange={setBillingAlias}
+            onAddressChange={setBillingAddress}
+            onSave={() => void saveAddress('billing')}
+            onClear={resetBillingForm}
+            onEdit={(row) => {
+              setBillingEditingId(row.id)
+              setBillingAlias(row.alias)
+              setBillingAddress(row.address_text)
+            }}
+            onView={(row) => viewAddressProfile(row, 'Billing Address')}
+            onSetDefault={(id) => void setDefaultAddress(id)}
+            onDelete={(id) => void removeAddress(id)}
+          />
+        </SettingsSectionGrid>
+      </section>
+
+      <ProfileDetailDialog
+        content={viewingProfile}
+        open={viewingProfile !== null}
+        onOpenChange={(open) => {
+          if (!open) setViewingProfile(null)
         }}
-        onSetDefault={(id) => void setDefaultAddress(id)}
-        onDelete={(id) => void removeAddress(id)}
       />
-    </div>
+    </SettingsPageShell>
   )
 }
 
@@ -351,67 +401,70 @@ function AddressSettingsSection(props: {
   onSave: () => void
   onClear: () => void
   onEdit: (row: PurchaseAddressProfile) => void
+  onView: (row: PurchaseAddressProfile) => void
   onSetDefault: (id: string) => void
   onDelete: (id: string) => void
 }) {
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>{props.title}</CardTitle>
-        <CardDescription>Create and manage reusable address profiles</CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-3">
-        <Input placeholder="Alias" value={props.alias} onChange={(e) => props.onAliasChange(e.target.value)} />
-        <Textarea
-          rows={4}
-          placeholder="Enter address..."
-          value={props.addressText}
-          onChange={(e) => props.onAddressChange(e.target.value)}
-        />
-        <div className="flex gap-2">
-          <Button onClick={props.onSave} disabled={props.saving}>
-            {props.saving ? 'Saving...' : props.editingId ? 'Update Address Profile' : 'Create Address Profile'}
-          </Button>
-          <Button variant="outline" onClick={props.onClear}>
-            <Plus className="mr-2 size-4" />
-            New
-          </Button>
-        </div>
-
-        {props.rows.length === 0 ? <p className="text-sm text-muted-foreground">No address profiles created yet.</p> : null}
-        {props.rows.map((row) => (
-          <div key={row.id} className="rounded-md border p-3">
-            <div className="mb-2 flex items-center justify-between gap-2">
-              <div>
-                <p className="font-medium">{row.alias}</p>
-                <p className="text-xs text-muted-foreground">{row.is_default ? 'Default profile' : 'Not default'}</p>
-              </div>
-              <div className="flex items-center gap-2">
-                {!row.is_default ? (
-                  <Button variant="outline" size="sm" onClick={() => props.onSetDefault(row.id)}>
-                    <Star className="mr-1 size-4" />
-                    Set Default
-                  </Button>
-                ) : (
-                  <Button variant="secondary" size="sm" disabled>
-                    <Star className="mr-1 size-4" />
-                    Default
-                  </Button>
-                )}
-                <Button variant="outline" size="sm" onClick={() => props.onEdit(row)}>
-                  <Pencil className="mr-1 size-4" />
-                  Edit
-                </Button>
-                <Button variant="destructive" size="sm" onClick={() => props.onDelete(row.id)}>
-                  <Trash2 className="mr-1 size-4" />
-                  Delete
-                </Button>
-              </div>
+    <div className="flex h-full min-w-0 flex-col gap-4">
+      <Card>
+        <CardHeader className="pb-3">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <CardTitle className="text-base">{props.title}</CardTitle>
+              <CardDescription>Create and manage reusable address profiles</CardDescription>
             </div>
-            <div className="whitespace-pre-wrap rounded border bg-muted/20 p-2 text-sm">{row.address_text}</div>
+            <Button variant="outline" size="sm" onClick={props.onClear}>
+              <Plus className="mr-2 size-4" />
+              New
+            </Button>
           </div>
-        ))}
-      </CardContent>
-    </Card>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <Input placeholder="Alias" value={props.alias} onChange={(e) => props.onAliasChange(e.target.value)} />
+          <Textarea
+            rows={4}
+            placeholder="Enter address..."
+            value={props.addressText}
+            onChange={(e) => props.onAddressChange(e.target.value)}
+          />
+          <div className="flex flex-wrap gap-2">
+            <Button onClick={props.onSave} disabled={props.saving}>
+              {props.saving ? 'Saving...' : props.editingId ? 'Update Address Profile' : 'Create Address Profile'}
+            </Button>
+            <Button variant="outline" onClick={props.onClear}>
+              Clear
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card className="flex min-h-0 flex-1 flex-col">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base">Saved Profiles</CardTitle>
+          <CardDescription>
+            {props.rows.length === 0
+              ? 'No address profiles created yet.'
+              : `${props.rows.length} profile${props.rows.length === 1 ? '' : 's'}`}
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="max-h-[min(50vh,480px)] space-y-2 overflow-y-auto">
+          {props.rows.length === 0 ? (
+            <p className="text-sm text-muted-foreground">Create your first address profile using the form.</p>
+          ) : null}
+          {props.rows.map((row) => (
+            <SavedProfileRow
+              key={row.id}
+              alias={row.alias}
+              isDefault={row.is_default}
+              onView={() => props.onView(row)}
+              onEdit={() => props.onEdit(row)}
+              onDelete={() => props.onDelete(row.id)}
+              onSetDefault={() => props.onSetDefault(row.id)}
+            />
+          ))}
+        </CardContent>
+      </Card>
+    </div>
   )
 }

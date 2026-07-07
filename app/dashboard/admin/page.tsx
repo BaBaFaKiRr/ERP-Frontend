@@ -1,6 +1,8 @@
 'use client'
 
+import { Suspense } from 'react'
 import Link from 'next/link'
+import { useSearchParams } from 'next/navigation'
 import {
   Card,
   CardContent,
@@ -9,78 +11,93 @@ import {
   CardTitle,
 } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Shield } from 'lucide-react'
+import { SettingsPageShell } from '@/components/settings/settings-page-shell'
+import { SettingsSectionGrid } from '@/components/settings/settings-split-layout'
+import { Building2, Shield } from 'lucide-react'
 
 export default function AdminPage() {
   return (
-    <div className="p-8">
-      <div className="flex justify-between items-start mb-8">
-        <div>
-          <h1 className="text-4xl font-bold text-gray-900 dark:text-white">Admin Panel</h1>
-          <p className="text-gray-600 mt-2">System administration and configuration</p>
-        </div>
-      </div>
+    <Suspense fallback={<div className="p-8 text-sm text-muted-foreground">Loading…</div>}>
+      <AdminPageContent />
+    </Suspense>
+  )
+}
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <Card>
+function AdminPageContent() {
+  const searchParams = useSearchParams()
+  const fromSettings = searchParams.get('from') === 'settings'
+  const backHref = fromSettings ? '/dashboard/settings' : undefined
+  const backLabel = fromSettings ? 'Back to Settings' : undefined
+
+  return (
+    <SettingsPageShell
+      title="Admin Panel"
+      description="System administration and organization configuration"
+      backLink={backHref && backLabel ? { href: backHref, label: backLabel } : undefined}
+    >
+      <SettingsSectionGrid columns={2}>
+        <Card className="flex flex-col">
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Shield className="h-5 w-5" />
+            <CardTitle className="flex items-center gap-2 text-base">
+              <Shield className="size-5" />
               Permissions
             </CardTitle>
             <CardDescription>
               View and edit module-wise ERP access for employees with login
             </CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="mt-auto">
             <Button className="w-full" asChild>
-              <Link href="/dashboard/admin/permissions">Manage Permissions</Link>
+              <Link href={`/dashboard/admin/permissions${fromSettings ? '?from=settings' : ''}`}>
+                Manage Permissions
+              </Link>
             </Button>
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="flex flex-col">
           <CardHeader>
-            <CardTitle>User Management</CardTitle>
+            <CardTitle className="flex items-center gap-2 text-base">
+              <Building2 className="size-5" />
+              Company Settings
+            </CardTitle>
+            <CardDescription>
+              Organization details, invoice profiles, and business preferences
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="mt-auto">
+            <Button className="w-full" asChild>
+              <Link href={`/dashboard/admin/company-settings${fromSettings ? '?from=settings' : ''}`}>
+                Configure Company
+              </Link>
+            </Button>
+          </CardContent>
+        </Card>
+
+        <Card className="flex flex-col">
+          <CardHeader>
+            <CardTitle className="text-base">User Management</CardTitle>
             <CardDescription>Manage system users and roles</CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="mt-auto">
             <Button className="w-full" variant="outline" disabled>
               Coming soon
             </Button>
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="flex flex-col">
           <CardHeader>
-            <CardTitle>Company Settings</CardTitle>
-            <CardDescription>Configure company details and preferences</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Button className="w-full">Configure</Button>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Data Management</CardTitle>
+            <CardTitle className="text-base">Data Management</CardTitle>
             <CardDescription>Backup, restore, and manage data</CardDescription>
           </CardHeader>
-          <CardContent>
-            <Button className="w-full">Manage Data</Button>
+          <CardContent className="mt-auto">
+            <Button className="w-full" variant="outline" disabled>
+              Coming soon
+            </Button>
           </CardContent>
         </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Reports & Analytics</CardTitle>
-            <CardDescription>View system reports and analytics</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Button className="w-full">View Reports</Button>
-          </CardContent>
-        </Card>
-      </div>
-    </div>
+      </SettingsSectionGrid>
+    </SettingsPageShell>
   )
 }
