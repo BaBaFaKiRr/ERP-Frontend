@@ -4,8 +4,8 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useParams } from 'next/navigation'
 import { ArrowLeft, ExternalLink } from 'lucide-react'
-import { createClient } from '@/lib/supabase/client'
 import { erpFetch } from '@/lib/erp-api'
+import { fetchPdfBlob } from '@/lib/fetch-pdf-blob'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Textarea } from '@/components/ui/textarea'
@@ -39,6 +39,7 @@ export default function SalesInvoiceDetailPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [pdfUrl, setPdfUrl] = useState<string | null>(null)
+  const [pdfError, setPdfError] = useState<string | null>(null)
   const [canceling, setCanceling] = useState(false)
   const [regenerating, setRegenerating] = useState(false)
   const [me, setMe] = useState<{ role: string; firstName?: string | null; lastName?: string | null; email: string } | null>(null)
@@ -61,6 +62,23 @@ export default function SalesInvoiceDetailPage() {
     }
   }
 
+  const loadPdf = async () => {
+    setPdfError(null)
+    try {
+      const blob = await fetchPdfBlob(`/api/dispatch-sales-invoices/${params.id}/pdf`)
+      setPdfUrl((prev) => {
+        if (prev) URL.revokeObjectURL(prev)
+        return URL.createObjectURL(blob)
+      })
+    } catch (e) {
+      setPdfUrl((prev) => {
+        if (prev) URL.revokeObjectURL(prev)
+        return null
+      })
+      setPdfError(e instanceof Error ? e.message : 'Failed to fetch invoice PDF')
+    }
+  }
+
   const load = async () => {
     setLoading(true)
     setError(null)
@@ -73,23 +91,10 @@ export default function SalesInvoiceDetailPage() {
       )
       setCreditNotes(creditNotesRes.data ?? [])
 
-      const supabase = createClient()
-      const { data: sessionData } = await supabase.auth.getSession()
-      const token = sessionData.session?.access_token
-      if (!token) throw new Error('Not authenticated')
-      const baseUrl = process.env.NEXT_PUBLIC_ERP_API_URL?.replace(/\/$/, '')
-      if (!baseUrl) throw new Error('NEXT_PUBLIC_ERP_API_URL is not set')
-      const pdfRes = await fetch(`${baseUrl}/api/dispatch-sales-invoices/${params.id}/pdf`, {
-        headers: { Authorization: `Bearer ${token}` },
-      })
-      if (!pdfRes.ok) throw new Error('Failed to fetch invoice PDF')
-      const blob = await pdfRes.blob()
-      if (pdfUrl) URL.revokeObjectURL(pdfUrl)
-      setPdfUrl(URL.createObjectURL(blob))
+      await loadPdf()
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to load sales invoice')
       setRow(null)
-      setPdfUrl(null)
     } finally {
       setLoading(false)
     }
@@ -243,6 +248,7 @@ export default function SalesInvoiceDetailPage() {
               <CardTitle>Invoice Preview</CardTitle>
             </CardHeader>
             <CardContent>
+              {pdfError ? <p className="text-sm text-red-600 mb-3">{pdfError}</p> : null}
               <div className="h-[75vh] rounded-md border bg-muted/20 overflow-hidden">
                 {pdfUrl ? (
                   <iframe title="Sales Invoice Preview" src={pdfUrl} className="w-full h-full border-0" />

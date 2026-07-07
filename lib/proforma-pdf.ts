@@ -1,13 +1,8 @@
 import { createClient } from '@/lib/supabase/client'
+import { getErpApiBaseUrl } from '@/lib/fetch-pdf-blob'
 
 function getBaseUrl(): string {
-  const url = process.env.NEXT_PUBLIC_ERP_API_URL
-  if (!url) {
-    throw new Error(
-      'NEXT_PUBLIC_ERP_API_URL is not set. Point it to your ERP-Backend (e.g. http://localhost:4000)',
-    )
-  }
-  return url.replace(/\/$/, '')
+  return getErpApiBaseUrl()
 }
 
 /**

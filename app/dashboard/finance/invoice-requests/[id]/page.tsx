@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { useParams } from 'next/navigation'
 import { ArrowLeft, ChevronDown, ChevronRight, ExternalLink } from 'lucide-react'
 import { erpFetch } from '@/lib/erp-api'
-import { createClient } from '@/lib/supabase/client'
+import { fetchPdfBlob } from '@/lib/fetch-pdf-blob'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -211,18 +211,7 @@ export default function InvoiceRequestDetailPage() {
     if (!data?.sales_order_id) return
     setProformaLoading(true)
     try {
-      const supabase = createClient()
-      const {
-        data: { session },
-      } = await supabase.auth.getSession()
-      if (!session?.access_token) throw new Error('Not authenticated')
-      const baseUrl = process.env.NEXT_PUBLIC_ERP_API_URL?.replace(/\/$/, '')
-      if (!baseUrl) throw new Error('NEXT_PUBLIC_ERP_API_URL is not set')
-      const res = await fetch(`${baseUrl}/api/dispatch/orders/${data.id}/proforma-pdf`, {
-        headers: { Authorization: `Bearer ${session.access_token}` },
-      })
-      if (!res.ok) throw new Error('Failed to fetch proforma invoice')
-      const blob = await res.blob()
+      const blob = await fetchPdfBlob(`/api/dispatch/orders/${data.id}/proforma-pdf`)
       if (proformaUrl) URL.revokeObjectURL(proformaUrl)
       const nextUrl = URL.createObjectURL(blob)
       setProformaUrl(nextUrl)
@@ -338,17 +327,7 @@ export default function InvoiceRequestDetailPage() {
       )
       setSettingsOpen(false)
 
-      const supabase = createClient()
-      const { data: sessionData } = await supabase.auth.getSession()
-      const token = sessionData.session?.access_token
-      if (!token) throw new Error('Not authenticated')
-      const baseUrl = process.env.NEXT_PUBLIC_ERP_API_URL?.replace(/\/$/, '')
-      if (!baseUrl) throw new Error('NEXT_PUBLIC_ERP_API_URL is not set')
-      const pdfRes = await fetch(`${baseUrl}/api/dispatch-sales-invoices/${createRes.data.id}/pdf`, {
-        headers: { Authorization: `Bearer ${token}` },
-      })
-      if (!pdfRes.ok) throw new Error('Failed to render generated sales invoice PDF')
-      const blob = await pdfRes.blob()
+      const blob = await fetchPdfBlob(`/api/dispatch-sales-invoices/${createRes.data.id}/pdf`)
       if (salesInvoiceUrl) URL.revokeObjectURL(salesInvoiceUrl)
       const nextUrl = URL.createObjectURL(blob)
       setSalesInvoiceUrl(nextUrl)
@@ -557,17 +536,7 @@ export default function InvoiceRequestDetailPage() {
                             variant="outline"
                             onClick={async () => {
                               try {
-                                const supabase = createClient()
-                                const { data: sessionData } = await supabase.auth.getSession()
-                                const token = sessionData.session?.access_token
-                                if (!token) throw new Error('Not authenticated')
-                                const baseUrl = process.env.NEXT_PUBLIC_ERP_API_URL?.replace(/\/$/, '')
-                                if (!baseUrl) throw new Error('NEXT_PUBLIC_ERP_API_URL is not set')
-                                const res = await fetch(`${baseUrl}/api/dispatch-sales-invoices/${inv.id}/pdf`, {
-                                  headers: { Authorization: `Bearer ${token}` },
-                                })
-                                if (!res.ok) throw new Error('Failed to fetch sales invoice PDF')
-                                const blob = await res.blob()
+                                const blob = await fetchPdfBlob(`/api/dispatch-sales-invoices/${inv.id}/pdf`)
                                 if (salesInvoiceUrl) URL.revokeObjectURL(salesInvoiceUrl)
                                 const nextUrl = URL.createObjectURL(blob)
                                 setSalesInvoiceUrl(nextUrl)
