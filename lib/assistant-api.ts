@@ -92,12 +92,14 @@ export async function assistantChatStream(
     model?: string
   },
   onEvent: (event: StreamEvent) => void,
+  signal?: AbortSignal,
 ): Promise<AssistantChatResponse> {
   const headers = await getAuthHeaders()
   const res = await fetch(`${getBaseUrl()}/api/assistant/chat/stream`, {
     method: 'POST',
     headers,
     body: JSON.stringify(input),
+    signal,
   })
 
   if (!res.ok) {

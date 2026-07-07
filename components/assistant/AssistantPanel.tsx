@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { Bot, Loader2, PanelRightClose, Send, Sparkles, Settings } from 'lucide-react'
+import { Bot, Loader2, PanelRightClose, Send, Sparkles, Settings, Square } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { ScrollArea } from '@/components/ui/scroll-area'
@@ -58,6 +58,7 @@ export function AssistantPanel({ onClose }: AssistantPanelProps) {
   const [selectedModel, setSelectedModel] = useState<string>('deepseek/deepseek-chat')
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
   const bottomRef = useRef<HTMLDivElement>(null)
+  const abortRef = useRef<AbortController | null>(null)
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -87,6 +88,8 @@ export function AssistantPanel({ onClose }: AssistantPanelProps) {
         .map((m) => ({ role: m.role, content: m.content }))
 
       let streamed = ''
+      const controller = new AbortController()
+      abortRef.current = controller
 
       try {
         const result = await assistantChatStream(
@@ -124,6 +127,7 @@ export function AssistantPanel({ onClose }: AssistantPanelProps) {
               )
             }
           },
+          controller.signal,
         )
 
         if (!streamed && result.answer) {
@@ -142,10 +146,22 @@ export function AssistantPanel({ onClose }: AssistantPanelProps) {
           )
         }
       } catch (e) {
-        const msg = e instanceof Error ? e.message : 'Assistant request failed'
-        setError(msg)
-        setMessages((prev) => prev.filter((m) => m.id !== assistantId))
+        if (e instanceof DOMException && e.name === 'AbortError') {
+          // User aborted — keep whatever was streamed so far
+          setMessages((prev) =>
+            prev.map((m) =>
+              m.id === assistantId
+                ? { ...m, content: streamed || '*(Response stopped)*', loading: false }
+                : m,
+            ),
+          )
+        } else {
+          const msg = e instanceof Error ? e.message : 'Assistant request failed'
+          setError(msg)
+          setMessages((prev) => prev.filter((m) => m.id !== assistantId))
+        }
       } finally {
+        abortRef.current = null
         setBusy(false)
         setToolStatus(null)
       }
@@ -290,20 +306,29 @@ export function AssistantPanel({ onClose }: AssistantPanelProps) {
             }}
             disabled={busy}
           />
-          <Button
-            type="button"
-            size="icon"
-            className="shrink-0 self-end"
-            onClick={() => sendMessage(input)}
-            disabled={busy || !input.trim()}
-            aria-label="Send"
-          >
-            {busy ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
+          {busy ? (
+            <Button
+              type="button"
+              size="icon"
+              variant="destructive"
+              className="shrink-0 self-end"
+              onClick={() => abortRef.current?.abort()}
+              aria-label="Stop generating"
+            >
+              <Square className="h-3.5 w-3.5 fill-current" />
+            </Button>
+          ) : (
+            <Button
+              type="button"
+              size="icon"
+              className="shrink-0 self-end"
+              onClick={() => sendMessage(input)}
+              disabled={!input.trim()}
+              aria-label="Send"
+            >
               <Send className="h-4 w-4" />
-            )}
-          </Button>
+            </Button>
+          )}
         </div>
       </div>
 
