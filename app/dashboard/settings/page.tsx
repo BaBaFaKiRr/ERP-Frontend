@@ -7,6 +7,7 @@ import {
   Building2,
   Database,
   DollarSign,
+  Settings2,
   ShoppingCart,
   User,
 } from 'lucide-react'
@@ -30,6 +31,12 @@ type SettingsLink = {
 }
 
 const MODULE_LINKS: SettingsLink[] = [
+  {
+    title: 'Preferences',
+    description: 'Document numbering and nomenclature for orders, invoices, and more',
+    href: '/dashboard/settings/preferences',
+    icon: Settings2,
+  },
   {
     title: 'Accounts',
     description: 'Invoice terms, bank details, and company profiles',
@@ -215,7 +222,7 @@ export default function SettingsPage() {
             </CardHeader>
             <CardContent className="mt-auto">
               <Button variant="outline" className="w-full" asChild>
-                <Link href="/dashboard/admin">
+                <Link href="/dashboard/admin?from=settings">
                   Admin panel
                   <ArrowRight className="ml-2 size-4" />
                 </Link>
