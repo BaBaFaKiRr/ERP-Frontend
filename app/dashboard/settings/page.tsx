@@ -7,6 +7,7 @@ import {
   Building2,
   Database,
   DollarSign,
+  Settings2,
   ShoppingCart,
   User,
 } from 'lucide-react'
@@ -30,6 +31,12 @@ type SettingsLink = {
 }
 
 const MODULE_LINKS: SettingsLink[] = [
+  {
+    title: 'Preferences',
+    description: 'Document numbering and nomenclature for orders, invoices, and more',
+    href: '/dashboard/settings/preferences',
+    icon: Settings2,
+  },
   {
     title: 'Accounts',
     description: 'Invoice terms, bank details, and company profiles',

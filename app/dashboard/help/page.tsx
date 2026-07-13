@@ -132,7 +132,7 @@ export default function HelpSupportPage() {
                     className={cn(
                       "flex gap-3 rounded-xl p-4 text-sm leading-relaxed",
                       m.role === 'user'
-                        ? "bg-indigo-500/10 border border-indigo-500/20 text-indigo-950 dark:text-indigo-100 ml-12"
+                        ? "bg-primary text-primary-foreground ml-12"
                         : "bg-muted/50 border border-border text-foreground mr-12"
                     )}
                   >
