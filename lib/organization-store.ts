@@ -91,4 +91,13 @@ export async function completeChecklistIntro(
     method: 'PATCH',
     body: { checklistIntroSeen: true },
   })
+  if (typeof window !== 'undefined') {
+    sessionStorage.setItem('erp-checklist-intro-seen', '1')
+  }
+}
+
+/** Client-side gate so dashboard does not bounce back before /api/me catches up. */
+export function hasLocalChecklistIntroSeen(): boolean {
+  if (typeof window === 'undefined') return false
+  return sessionStorage.getItem('erp-checklist-intro-seen') === '1'
 }

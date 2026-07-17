@@ -17,13 +17,19 @@ export default function AuthErrorPage() {
         <p className="text-muted-foreground text-xs uppercase tracking-[0.2em]">LEJER</p>
       </div>
       <div className="flex flex-col items-center gap-4 text-center">
-        <h1 className="text-2xl font-semibold">Sign-in failed</h1>
+        <h1 className="text-2xl font-semibold">Authentication failed</h1>
         <p className="text-muted-foreground max-w-md text-center text-sm">
-          The session could not be established. Try again, or contact support if this keeps happening.
+          The link may have expired or already been used. Try signing in again,
+          or request a new password reset link.
         </p>
-        <Button asChild>
-          <Link href="/auth/login">Back to login</Link>
-        </Button>
+        <div className="flex flex-col gap-2 sm:flex-row">
+          <Button asChild variant="outline">
+            <Link href="/auth/forgot-password">Reset password</Link>
+          </Button>
+          <Button asChild>
+            <Link href="/auth/login">Back to login</Link>
+          </Button>
+        </div>
       </div>
     </div>
   )

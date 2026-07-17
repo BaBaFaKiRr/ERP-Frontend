@@ -12,6 +12,7 @@ import {
 import { useRouter, usePathname } from 'next/navigation'
 import {
   getActiveOrganizationId,
+  hasLocalChecklistIntroSeen,
   setActiveOrganizationId,
   type MeOnboardingSummary,
   type MeResponse,
@@ -102,6 +103,9 @@ export function OrganizationProvider({ children }: { children: ReactNode }) {
       router.replace('/onboarding')
       return
     }
+
+    // After "Continue to dashboard", avoid bouncing back even if /api/me is briefly stale.
+    if (hasLocalChecklistIntroSeen()) return
 
     if (
       shouldAutoRedirectToChecklist(me) &&

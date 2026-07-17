@@ -1,6 +1,5 @@
 'use client'
 
-import { getAuthCallbackUrl } from '@/lib/auth-redirect'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import {
@@ -12,42 +11,38 @@ import {
 } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import Link from 'next/link'
-import { useRouter } from 'next/navigation'
-import { useState } from 'react'
 import Image from 'next/image'
+import Link from 'next/link'
+import { useRouter, useSearchParams } from 'next/navigation'
+import { useState } from 'react'
 import { LEJER_LOGO_MARK_SRC } from '@/lib/branding'
+import { erpFetch } from '@/lib/erp-api'
+import { resolvePostAuthPath } from '@/lib/post-auth-routing'
+import type { MeResponse } from '@/lib/organization-store'
 
-export default function Page() {
+export function LoginForm() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
-  const [repeatPassword, setRepeatPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const passwordResetSuccess = searchParams.get('reset') === 'success'
 
-  const handleSignUp = async (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
     const supabase = createClient()
     setIsLoading(true)
     setError(null)
 
-    if (password !== repeatPassword) {
-      setError('Passwords do not match')
-      setIsLoading(false)
-      return
-    }
-
     try {
-      const { error } = await supabase.auth.signUp({
+      const { error } = await supabase.auth.signInWithPassword({
         email,
         password,
-        options: {
-          emailRedirectTo: getAuthCallbackUrl(),
-        },
       })
       if (error) throw error
-      router.push('/auth/sign-up-success')
+      const me = await erpFetch<MeResponse>('/api/me')
+      router.push(resolvePostAuthPath(me))
     } catch (error: unknown) {
       setError(error instanceof Error ? error.message : 'An error occurred')
     } finally {
@@ -75,11 +70,13 @@ export default function Page() {
           </div>
           <Card>
             <CardHeader>
-              <CardTitle className="text-2xl">Sign up</CardTitle>
-              <CardDescription>Create your LEJER account</CardDescription>
+              <CardTitle className="text-2xl">Login</CardTitle>
+              <CardDescription>
+                Enter your email below to sign in to LEJER
+              </CardDescription>
             </CardHeader>
             <CardContent>
-              <form onSubmit={handleSignUp}>
+              <form onSubmit={handleLogin}>
                 <div className="flex flex-col gap-6">
                   <div className="grid gap-2">
                     <Label htmlFor="email">Email</Label>
@@ -93,8 +90,14 @@ export default function Page() {
                     />
                   </div>
                   <div className="grid gap-2">
-                    <div className="flex items-center">
+                    <div className="flex items-center justify-between">
                       <Label htmlFor="password">Password</Label>
+                      <Link
+                        href="/auth/forgot-password"
+                        className="text-muted-foreground text-sm underline-offset-4 hover:underline"
+                      >
+                        Forgot password?
+                      </Link>
                     </div>
                     <Input
                       id="password"
@@ -104,30 +107,24 @@ export default function Page() {
                       onChange={(e) => setPassword(e.target.value)}
                     />
                   </div>
-                  <div className="grid gap-2">
-                    <div className="flex items-center">
-                      <Label htmlFor="repeat-password">Repeat Password</Label>
-                    </div>
-                    <Input
-                      id="repeat-password"
-                      type="password"
-                      required
-                      value={repeatPassword}
-                      onChange={(e) => setRepeatPassword(e.target.value)}
-                    />
-                  </div>
+                  {passwordResetSuccess && (
+                    <p className="text-sm text-green-600">
+                      Your password was updated. Sign in with your new
+                      password.
+                    </p>
+                  )}
                   {error && <p className="text-sm text-red-500">{error}</p>}
                   <Button type="submit" className="w-full" disabled={isLoading}>
-                    {isLoading ? 'Creating an account...' : 'Sign up'}
+                    {isLoading ? 'Logging in...' : 'Login'}
                   </Button>
                 </div>
                 <div className="mt-4 text-center text-sm">
-                  Already have an account?{' '}
+                  Don&apos;t have an account?{' '}
                   <Link
-                    href="/auth/login"
+                    href="/auth/sign-up"
                     className="underline underline-offset-4"
                   >
-                    Login
+                    Sign up
                   </Link>
                 </div>
               </form>

@@ -12,6 +12,10 @@ type Props = {
   state: OnboardingState
   onRefresh: () => Promise<void>
   compact?: boolean
+  /** When set, shows a Continue control that calls this (marks intro seen). Parent owns navigation. */
+  onContinueToDashboard?: () => void | Promise<void>
+  continueLabel?: string
+  continueDisabled?: boolean
 }
 
 async function downloadSample(segment: string) {
@@ -21,7 +25,14 @@ async function downloadSample(segment: string) {
   downloadBlob(blob, filename ?? `import-${segment}-sample.csv`)
 }
 
-export function OnboardingChecklist({ state, onRefresh, compact }: Props) {
+export function OnboardingChecklist({
+  state,
+  onRefresh,
+  compact,
+  onContinueToDashboard,
+  continueLabel = 'Continue to dashboard',
+  continueDisabled,
+}: Props) {
   const { progress, tasks } = state
 
   const handleSkip = async (task: OnboardingTask) => {
@@ -132,14 +143,20 @@ export function OnboardingChecklist({ state, onRefresh, compact }: Props) {
         })}
       </ul>
 
-      {!compact && !progress.isComplete ? (
+      {!compact && !progress.isComplete && !progress.checklistDismissed ? (
         <div className="flex flex-wrap justify-end gap-2 border-t border-[#e2e8f0] pt-4 dark:border-white/10">
           <Button type="button" variant="outline" onClick={() => void handleDismiss()}>
             Hide checklist
           </Button>
-          <Button type="button" asChild>
-            <Link href="/dashboard">Continue to dashboard</Link>
-          </Button>
+          {onContinueToDashboard ? (
+            <Button
+              type="button"
+              disabled={continueDisabled}
+              onClick={() => void onContinueToDashboard()}
+            >
+              {continueLabel}
+            </Button>
+          ) : null}
         </div>
       ) : null}
     </div>

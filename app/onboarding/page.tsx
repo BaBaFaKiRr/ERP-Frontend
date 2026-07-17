@@ -141,7 +141,6 @@ export default function OnboardingPage() {
       router.replace('/dashboard')
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Could not continue to dashboard')
-    } finally {
       setSubmitting(false)
     }
   }
@@ -209,8 +208,8 @@ export default function OnboardingPage() {
           Welcome to LEJER
         </h1>
         <p className="mt-2 text-sm text-[#64748b] dark:text-slate-400">
-          A few quick steps to set up your manufacturing ERP workspace. You can leave anytime and
-          continue from the dashboard.
+          A few quick steps to set up your manufacturing ERP workspace. After organization setup,
+          you can continue to the dashboard and finish optional checklist items later.
         </p>
       </div>
 
@@ -452,26 +451,26 @@ export default function OnboardingPage() {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
-            <OnboardingChecklist state={checklist} onRefresh={loadChecklist} />
-            <div className="flex justify-end">
-              <Button type="button" disabled={submitting} onClick={() => void continueToDashboard()}>
-                {submitting ? 'Continuing…' : 'Continue to dashboard'}
-              </Button>
-            </div>
+            <OnboardingChecklist
+              state={checklist}
+              onRefresh={loadChecklist}
+              onContinueToDashboard={continueToDashboard}
+              continueDisabled={submitting}
+              continueLabel={submitting ? 'Continuing…' : 'Continue to dashboard'}
+            />
+            {checklist.progress.checklistDismissed ? (
+              <div className="flex justify-end">
+                <Button
+                  type="button"
+                  disabled={submitting}
+                  onClick={() => void continueToDashboard()}
+                >
+                  {submitting ? 'Continuing…' : 'Continue to dashboard'}
+                </Button>
+              </div>
+            ) : null}
           </CardContent>
         </Card>
-      ) : null}
-
-      {step < 3 ? (
-        <p className="text-center text-xs text-[#64748b] dark:text-slate-400">
-          <button
-            type="button"
-            className="underline underline-offset-2 hover:text-[#334155]"
-            onClick={() => router.replace('/dashboard')}
-          >
-            Skip for now and open dashboard
-          </button>
-        </p>
       ) : null}
     </div>
   )
