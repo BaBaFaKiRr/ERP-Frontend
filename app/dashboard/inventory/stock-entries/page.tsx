@@ -33,6 +33,7 @@ import { Badge } from '@/components/ui/badge'
 import { ArrowUpDown, ArrowRightLeft, ClipboardList, Filter, Plus, Search } from 'lucide-react'
 import { erpFetch } from '@/lib/erp-api'
 import { cn } from '@/lib/utils'
+import { GenerateReportButton } from '@/components/reports/generate-report-button'
 
 type LineRow = {
   id: string
@@ -223,6 +224,7 @@ export default function StockEntriesListPage() {
           </p>
         </div>
         <div className="flex flex-wrap gap-2 shrink-0">
+          <GenerateReportButton reportType="stock_entries" />
           <Button variant="outline" className="flex items-center gap-2" asChild>
             <Link href="/dashboard/inventory/stock-entries/transfer">
               <ArrowRightLeft size={18} />

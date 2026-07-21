@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { EntityActivityLog } from '@/components/entity-activity-log'
 import Link from 'next/link'
 import { useParams } from 'next/navigation'
 import { ArrowLeft } from 'lucide-react'
@@ -159,6 +160,8 @@ export default function WarehouseDetailPage() {
           )}
         </CardContent>
       </Card>
+
+      <EntityActivityLog entityType="warehouse" entityId={warehouse?.id} />
     </div>
   )
 }

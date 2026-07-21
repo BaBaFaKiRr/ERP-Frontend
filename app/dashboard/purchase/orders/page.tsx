@@ -22,6 +22,7 @@ import {
 } from '@/components/ui/table'
 import { Plus, Search } from 'lucide-react'
 import { erpFetch } from '@/lib/erp-api'
+import { GenerateReportButton } from '@/components/reports/generate-report-button'
 
 type PurchaseOrderRow = {
   id: string
@@ -82,12 +83,15 @@ export default function PurchaseOrdersPage() {
           <h1 className="text-4xl font-bold text-gray-900 dark:text-white">Purchase Orders</h1>
           <p className="text-gray-600 mt-2">Manage purchase orders to suppliers</p>
         </div>
-        <Link href="/dashboard/purchase/create">
-          <Button className="flex items-center gap-2">
-            <Plus size={18} />
-            Create Purchase Order
-          </Button>
-        </Link>
+        <div className="flex items-center gap-2">
+          <GenerateReportButton reportType="purchase_orders" />
+          <Link href="/dashboard/purchase/create">
+            <Button className="flex items-center gap-2">
+              <Plus size={18} />
+              Create Purchase Order
+            </Button>
+          </Link>
+        </div>
       </div>
 
       {error && <p className="mb-4 text-sm text-red-600">{error}</p>}

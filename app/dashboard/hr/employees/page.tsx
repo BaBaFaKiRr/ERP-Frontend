@@ -19,6 +19,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { erpFetch } from '@/lib/erp-api'
+import { GenerateReportButton } from '@/components/reports/generate-report-button'
 
 type Employee = {
   id: string
@@ -113,6 +114,7 @@ export default function EmployeesPage() {
           </p>
         </div>
         <div className="flex shrink-0 flex-wrap items-center gap-2">
+          <GenerateReportButton reportType="salary_slips" />
           {isAdmin && (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>

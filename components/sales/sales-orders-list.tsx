@@ -32,6 +32,7 @@ import {
 import { ArrowLeft, ArrowUpDown, Filter, Plus, Search } from 'lucide-react'
 import { erpFetch } from '@/lib/erp-api'
 import { cn } from '@/lib/utils'
+import { GenerateReportButton } from '@/components/reports/generate-report-button'
 
 type SalesOrderRow = {
   id: string
@@ -211,12 +212,15 @@ function SalesOrdersListContent({ backHref = '/dashboard/sales' }: SalesOrdersLi
             <p className="text-gray-600 mt-2">Create and approve sales orders (SL-YYYY-NNNNN)</p>
           </div>
         </div>
-        <Button asChild className="flex items-center gap-2">
-          <Link href="/dashboard/sales/create">
-            <Plus size={18} />
-            Create sales order
-          </Link>
-        </Button>
+        <div className="flex items-center gap-2">
+          <GenerateReportButton reportType="sales_orders" />
+          <Button asChild className="flex items-center gap-2">
+            <Link href="/dashboard/sales/create">
+              <Plus size={18} />
+              Create sales order
+            </Link>
+          </Button>
+        </div>
       </div>
 
       {error && (

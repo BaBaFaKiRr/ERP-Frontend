@@ -12,7 +12,11 @@ type EditLog = {
   created_at: string
   details: Record<string, unknown>
   employee?: { employee_code?: string | null; full_name?: string | null } | null
-  actor?: { first_name?: string | null; last_name?: string | null; email?: string | null; role?: string | null } | null
+  actor?: {
+    name?: string | null
+    employee_id?: string | null
+    employee_code?: string | null
+  } | null
 }
 
 export default function HREditLogsPage() {
@@ -66,9 +70,10 @@ export default function HREditLogsPage() {
                     {log.employee?.employee_code ?? '-'} - {log.employee?.full_name ?? 'Employee'}
                   </p>
                   <p>
-                    Action: {log.action} | By:{' '}
-                    {[log.actor?.first_name, log.actor?.last_name].filter(Boolean).join(' ') || log.actor?.email || 'Unknown'}
-                    {log.actor?.role ? ` (${log.actor.role})` : ''} | On: {new Date(log.created_at).toLocaleString()}
+                    Action: {log.action} | By: {log.actor?.name ?? 'Unknown'}
+                    {log.actor?.employee_code ? ` (${log.actor.employee_code})` : ''}
+                    {log.actor?.employee_id ? ` · Employee ID: ${log.actor.employee_id}` : ''} | On:{' '}
+                    {new Date(log.created_at).toLocaleString()}
                   </p>
                 </div>
               ))

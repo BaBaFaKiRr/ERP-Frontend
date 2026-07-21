@@ -17,6 +17,7 @@ import {
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { cn } from '@/lib/utils'
+import { EntityActivityLog } from '@/components/entity-activity-log'
 
 type Employee = {
   id: string
@@ -96,6 +97,7 @@ export default function EmployeeDetailsPage() {
   const [inviteOpen, setInviteOpen] = useState(false)
   const [inviteUrl, setInviteUrl] = useState<string | null>(null)
   const [inviteExpiresAt, setInviteExpiresAt] = useState<string | null>(null)
+  const [inviteEmailSent, setInviteEmailSent] = useState<boolean | null>(null)
   const [inviteLoading, setInviteLoading] = useState(false)
   const [revokeLoading, setRevokeLoading] = useState(false)
   const [copied, setCopied] = useState(false)
@@ -308,12 +310,13 @@ export default function EmployeeDetailsPage() {
     setInviteLoading(true)
     setError(null)
     try {
-      const res = await erpFetch<{ inviteUrl: string; expiresAt: string }>(
+      const res = await erpFetch<{ inviteUrl: string; expiresAt: string; emailSent?: boolean }>(
         `/api/employees/${employee.id}/invite`,
         { method: 'POST' },
       )
       setInviteUrl(res.inviteUrl)
       setInviteExpiresAt(res.expiresAt)
+      setInviteEmailSent(res.emailSent ?? false)
       setInviteOpen(true)
       await reload()
     } catch (err) {
@@ -468,6 +471,11 @@ export default function EmployeeDetailsPage() {
             <DialogDescription>
               Share this one-time link with {employee?.full_name ?? 'the employee'}. Each new invite
               invalidates any previous link. Valid for 36 hours from when it was generated.
+              {inviteEmailSent
+                ? ' An invitation email was also sent to their work email address.'
+                : inviteEmailSent === false
+                  ? ' Email delivery is not configured — copy the link below and send it manually.'
+                  : null}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-3">
@@ -1075,6 +1083,8 @@ export default function EmployeeDetailsPage() {
           </CardContent>
         </Card>
       ) : null}
+
+      <EntityActivityLog entityType="employee" entityId={employee?.id} />
     </div>
   )
 }

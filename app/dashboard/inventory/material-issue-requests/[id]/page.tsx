@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { EntityActivityLog } from '@/components/entity-activity-log'
 import Link from 'next/link'
 import { useParams, useRouter } from 'next/navigation'
 import { ArrowLeft } from 'lucide-react'
@@ -348,6 +349,8 @@ export default function MaterialIssueRequestDetailPage() {
           ) : null}
         </CardContent>
       </Card>
+
+      <EntityActivityLog entityType="material_issue_request" entityId={data?.request?.id} />
     </div>
   )
 }

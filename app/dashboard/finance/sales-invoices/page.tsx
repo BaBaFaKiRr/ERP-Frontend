@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { GenerateReportButton } from '@/components/reports/generate-report-button'
 
 type DispatchSalesInvoice = {
   id: string
@@ -118,11 +119,14 @@ export default function SalesInvoicesPage() {
 
   return (
     <div className="p-6 md:p-8 space-y-6">
-      <Button asChild variant="ghost" className="pl-0">
-        <Link href="/dashboard/finance">
-          <ArrowLeft className="size-4 mr-2" /> Back to Accounts
-        </Link>
-      </Button>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <Button asChild variant="ghost" className="pl-0">
+          <Link href="/dashboard/finance">
+            <ArrowLeft className="size-4 mr-2" /> Back to Accounts
+          </Link>
+        </Button>
+        <GenerateReportButton reportType="sales_invoices" />
+      </div>
 
       <Card>
         <CardHeader>

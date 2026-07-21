@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { EntityActivityLog } from '@/components/entity-activity-log'
 import Link from 'next/link'
 import { useParams, useRouter } from 'next/navigation'
 import { ArrowLeft } from 'lucide-react'
@@ -155,6 +156,8 @@ export default function DepositRequestDetailPage() {
           <Button onClick={() => void approve()} disabled={acting}>{acting ? 'Processing…' : 'Approve'}</Button>
         </div>
       ) : null}
+
+      <EntityActivityLog entityType="material_deposit_request" entityId={data?.request?.id} />
     </div>
   )
 }

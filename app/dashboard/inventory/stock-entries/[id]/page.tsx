@@ -31,6 +31,7 @@ import {
 import { ArrowLeft, ClipboardList, Trash2 } from 'lucide-react'
 import { erpFetch } from '@/lib/erp-api'
 import { cn } from '@/lib/utils'
+import { EntityActivityLog } from '@/components/entity-activity-log'
 
 type ItemRef = {
   id: string
@@ -337,6 +338,8 @@ export default function StockEntryDetailPage() {
           </CardContent>
         </Card>
       </div>
+
+      <EntityActivityLog entityType="stock_entry" entityId={entry?.id} />
     </div>
   )
 }

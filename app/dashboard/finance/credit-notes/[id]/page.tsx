@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { EntityActivityLog } from '@/components/entity-activity-log'
 import Link from 'next/link'
 import { useParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
@@ -197,6 +198,8 @@ export default function CreditNoteDetailPage() {
           )}
         </CardContent>
       </Card>
+
+      <EntityActivityLog entityType="credit_note" entityId={data?.id} />
     </div>
   )
 }

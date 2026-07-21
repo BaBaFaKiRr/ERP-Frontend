@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { GenerateReportButton } from '@/components/reports/generate-report-button'
 
 type PaymentEntryRow = {
   id: string
@@ -91,12 +92,15 @@ export default function PaymentEntriesPage() {
             <p className="mt-1 text-sm text-muted-foreground">All recorded payments across purchase invoices and manual entries.</p>
           </div>
         </div>
-        <Link href="/dashboard/finance/payment-entries/new">
-          <Button className="gap-2">
-            <Plus size={16} />
-            Add Payment Entry
-          </Button>
-        </Link>
+        <div className="flex items-center gap-2">
+          <GenerateReportButton reportType="payment_entries" />
+          <Link href="/dashboard/finance/payment-entries/new">
+            <Button className="gap-2">
+              <Plus size={16} />
+              Add Payment Entry
+            </Button>
+          </Link>
+        </div>
       </div>
 
       {error ? <p className="text-sm text-red-600">{error}</p> : null}

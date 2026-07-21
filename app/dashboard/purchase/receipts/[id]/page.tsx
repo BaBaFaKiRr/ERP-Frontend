@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
+import { EntityActivityLog } from '@/components/entity-activity-log'
 import Link from 'next/link'
 import { useParams } from 'next/navigation'
 import { ArrowLeft, Pencil } from 'lucide-react'
@@ -467,6 +468,8 @@ export default function PurchaseReceiptDetailPage() {
           </CardContent>
         </Card>
       </div>
+
+      <EntityActivityLog entityType="purchase_receipt" entityId={data?.id} />
     </div>
   )
 }

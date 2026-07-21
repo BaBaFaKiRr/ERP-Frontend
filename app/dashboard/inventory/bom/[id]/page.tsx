@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { EntityActivityLog } from '@/components/entity-activity-log'
 import Link from 'next/link'
 import { useParams } from 'next/navigation'
 
@@ -133,6 +134,8 @@ export default function BomDetailPage() {
           </Card>
         </>
       ) : null}
+
+      <EntityActivityLog entityType="bom" entityId={detail?.id} />
     </div>
   )
 }

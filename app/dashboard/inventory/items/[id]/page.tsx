@@ -22,6 +22,7 @@ import {
 } from '@/components/ui/alert-dialog'
 import { ArrowLeft, Package, Trash2 } from 'lucide-react'
 import { erpFetch } from '@/lib/erp-api'
+import { EntityActivityLog } from '@/components/entity-activity-log'
 import { cn } from '@/lib/utils'
 
 type ItemDetail = {
@@ -271,6 +272,8 @@ export default function ItemDetailPage() {
           </Card>
         )}
       </div>
+
+      <EntityActivityLog entityType="item" entityId={item?.id} />
     </div>
   )
 }

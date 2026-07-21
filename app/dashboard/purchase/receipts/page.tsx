@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Plus, Search } from 'lucide-react'
 import { erpFetch } from '@/lib/erp-api'
+import { GenerateReportButton } from '@/components/reports/generate-report-button'
 
 type PurchaseReceiptRow = {
   id: string
@@ -72,12 +73,15 @@ export default function PurchaseReceiptsPage() {
           <h1 className="text-4xl font-bold text-gray-900 dark:text-white">Purchase Receipts</h1>
           <p className="mt-2 text-gray-600">List and track all purchase receipts</p>
         </div>
-        <Link href="/dashboard/purchase/receipts/new">
-          <Button className="flex items-center gap-2">
-            <Plus size={18} />
-            Add Purchase Receipt
-          </Button>
-        </Link>
+        <div className="flex items-center gap-2">
+          <GenerateReportButton reportType="purchase_receipts" />
+          <Link href="/dashboard/purchase/receipts/new">
+            <Button className="flex items-center gap-2">
+              <Plus size={18} />
+              Add Purchase Receipt
+            </Button>
+          </Link>
+        </div>
       </div>
 
       {error && <p className="mb-4 text-sm text-red-600">{error}</p>}

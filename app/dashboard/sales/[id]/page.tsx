@@ -36,6 +36,7 @@ import {
   isDispatchEligibleSalesOrder,
 } from '@/lib/dispatch-eligibility'
 import { cn } from '@/lib/utils'
+import { EntityActivityLog } from '@/components/entity-activity-log'
 
 type LineRow = {
   id: string
@@ -765,6 +766,8 @@ export default function SalesOrderDetailPage() {
           </CardContent>
         </Card>
       </div>
+
+      <EntityActivityLog entityType="sales_order" entityId={order?.id} />
     </div>
   )
 }

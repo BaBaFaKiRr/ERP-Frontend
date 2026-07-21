@@ -17,6 +17,7 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { cn } from '@/lib/utils'
+import { EntityActivityLog } from '@/components/entity-activity-log'
 
 type Customer = {
   id: string
@@ -274,6 +275,8 @@ export default function CustomerDetailsPage() {
           </div>
         </CardContent>
       </Card>
+
+      <EntityActivityLog entityType="customer" entityId={customer.id} />
     </div>
   )
 }

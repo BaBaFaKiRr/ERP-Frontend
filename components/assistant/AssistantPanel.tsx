@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { Bot, Loader2, PanelRightClose, Send, Sparkles, Settings, Square } from 'lucide-react'
+import { ArrowUp, Bot, ChevronDown, Loader2, PanelRightClose, Sparkles, Square } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { ScrollArea } from '@/components/ui/scroll-area'
@@ -15,19 +15,18 @@ import {
   type StreamEvent,
 } from '@/lib/assistant-api'
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog'
-import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from '@/components/ui/collapsible'
+import type { AssistantToolStep } from '@/lib/assistant-api'
 
 const MODELS = [
   { id: 'deepseek/deepseek-chat', name: 'DeepSeek Chat' },
@@ -56,7 +55,6 @@ export function AssistantPanel({ onClose }: AssistantPanelProps) {
   const [toolStatus, setToolStatus] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [selectedModel, setSelectedModel] = useState<string>('deepseek/deepseek-chat')
-  const [isSettingsOpen, setIsSettingsOpen] = useState(false)
   const bottomRef = useRef<HTMLDivElement>(null)
   const abortRef = useRef<AbortController | null>(null)
 
@@ -177,21 +175,9 @@ export function AssistantPanel({ onClose }: AssistantPanelProps) {
             <Sparkles className="h-4 w-4 shrink-0 text-violet-500" />
             LEJER Assistant
           </div>
-          <p className="mt-0.5 text-xs text-muted-foreground">
-            {MODELS.find((m) => m.id === selectedModel)?.name || selectedModel} • Read-only
-          </p>
+          <p className="mt-0.5 text-xs text-muted-foreground">Read-only</p>
         </div>
-        <div className="flex items-center gap-1 shrink-0">
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            className="h-8 w-8 rounded-lg"
-            onClick={() => setIsSettingsOpen(true)}
-            aria-label="Assistant settings"
-          >
-            <Settings className="h-4 w-4" />
-          </Button>
+        <div className="flex shrink-0 items-center gap-1">
           <Button
             type="button"
             variant="ghost"
@@ -252,11 +238,7 @@ export function AssistantPanel({ onClose }: AssistantPanelProps) {
                 <p className="whitespace-pre-wrap">{m.content}</p>
               )}
               {m.toolSteps && m.toolSteps.length > 0 ? (
-                <ul className="mt-2 space-y-0.5 text-xs text-muted-foreground">
-                  {m.toolSteps.map((s, i) => (
-                    <li key={i}>✓ {formatToolName(s.tool)}</li>
-                  ))}
-                </ul>
+                <AssistantToolLogs steps={m.toolSteps} />
               ) : null}
               {m.links && m.links.length > 0 ? (
                 <div className="mt-2 flex flex-wrap gap-1">
@@ -291,13 +273,13 @@ export function AssistantPanel({ onClose }: AssistantPanelProps) {
       </ScrollArea>
 
       <div className="shrink-0 border-t border-border/60 p-3">
-        <div className="flex gap-2">
+        <div className="rounded-2xl border border-border/80 bg-muted/15 shadow-sm transition-shadow focus-within:border-border focus-within:ring-1 focus-within:ring-ring/30">
           <Textarea
             value={input}
             onChange={(e) => setInput(e.target.value)}
             placeholder="Ask about orders, inventory, shortages…"
             rows={2}
-            className="min-h-[60px] resize-none"
+            className="min-h-[72px] resize-none border-0 bg-transparent px-3 pt-3 pb-1 shadow-none focus-visible:ring-0"
             onKeyDown={(e) => {
               if (e.key === 'Enter' && !e.shiftKey) {
                 e.preventDefault()
@@ -306,61 +288,55 @@ export function AssistantPanel({ onClose }: AssistantPanelProps) {
             }}
             disabled={busy}
           />
-          {busy ? (
-            <Button
-              type="button"
-              size="icon"
-              variant="destructive"
-              className="shrink-0 self-end"
-              onClick={() => abortRef.current?.abort()}
-              aria-label="Stop generating"
-            >
-              <Square className="h-3.5 w-3.5 fill-current" />
-            </Button>
-          ) : (
-            <Button
-              type="button"
-              size="icon"
-              className="shrink-0 self-end"
-              onClick={() => sendMessage(input)}
-              disabled={!input.trim()}
-              aria-label="Send"
-            >
-              <Send className="h-4 w-4" />
-            </Button>
-          )}
+          <div className="flex items-center justify-between gap-2 px-2 pb-2">
+            <Select value={selectedModel} onValueChange={setSelectedModel} disabled={busy}>
+              <SelectTrigger
+                size="sm"
+                className="h-7 max-w-[11rem] rounded-full border-border/70 bg-background/90 px-2.5 text-xs shadow-none focus:ring-1"
+                aria-label="AI model"
+              >
+                <SelectValue placeholder="Model" />
+              </SelectTrigger>
+              <SelectContent align="start">
+                {MODELS.map((model) => (
+                  <SelectItem key={model.id} value={model.id}>
+                    {model.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            {busy ? (
+              <Button
+                type="button"
+                size="icon"
+                variant="secondary"
+                className="h-8 w-8 shrink-0 rounded-full"
+                onClick={() => abortRef.current?.abort()}
+                aria-label="Stop generating"
+              >
+                <Square className="h-3.5 w-3.5 fill-current" />
+              </Button>
+            ) : (
+              <Button
+                type="button"
+                size="icon"
+                className={cn(
+                  'h-8 w-8 shrink-0 rounded-full transition-colors',
+                  input.trim()
+                    ? 'bg-primary text-primary-foreground hover:bg-primary/90'
+                    : 'bg-muted text-muted-foreground hover:bg-muted',
+                )}
+                onClick={() => sendMessage(input)}
+                disabled={!input.trim()}
+                aria-label="Send"
+              >
+                <ArrowUp className="h-4 w-4" />
+              </Button>
+            )}
+          </div>
         </div>
       </div>
-
-      <Dialog open={isSettingsOpen} onOpenChange={setIsSettingsOpen}>
-        <DialogContent className="sm:max-w-[425px]">
-          <DialogHeader>
-            <DialogTitle>Assistant Settings</DialogTitle>
-            <DialogDescription>
-              Choose which AI model you want the assistant to use. Providers and keys are configured via environment variables.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="grid gap-4 py-4">
-            <div className="grid gap-2">
-              <label htmlFor="model-select" className="text-sm font-medium">
-                Active AI Model
-              </label>
-              <Select value={selectedModel} onValueChange={setSelectedModel}>
-                <SelectTrigger id="model-select" className="w-full">
-                  <SelectValue placeholder="Select a model" />
-                </SelectTrigger>
-                <SelectContent>
-                  {MODELS.map((model) => (
-                    <SelectItem key={model.id} value={model.id}>
-                      {model.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
     </div>
   )
 }
@@ -387,6 +363,32 @@ export function AssistantTrigger({
       <Sparkles size={16} className="text-violet-500" />
       <span>Assistant</span>
     </Button>
+  )
+}
+
+function AssistantToolLogs({ steps }: { steps: AssistantToolStep[] }) {
+  const errorCount = steps.filter((s) => s.status === 'error').length
+
+  return (
+    <Collapsible className="mt-2">
+      <CollapsibleTrigger className="group flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground">
+        <ChevronDown className="h-3 w-3 shrink-0 transition-transform group-data-[state=open]:rotate-180" />
+        <span>
+          View Logs
+          {errorCount > 0 ? ` (${steps.length}, ${errorCount} failed)` : ` (${steps.length})`}
+        </span>
+      </CollapsibleTrigger>
+      <CollapsibleContent>
+        <ul className="mt-1.5 max-h-48 space-y-0.5 overflow-y-auto border-l border-border/60 pl-2 text-xs text-muted-foreground">
+          {steps.map((s, i) => (
+            <li key={i}>
+              {s.status === 'error' ? '✗' : '✓'} {formatToolName(s.tool)}
+              {s.status === 'error' && s.summary ? ` — ${s.summary}` : ''}
+            </li>
+          ))}
+        </ul>
+      </CollapsibleContent>
+    </Collapsible>
   )
 }
 

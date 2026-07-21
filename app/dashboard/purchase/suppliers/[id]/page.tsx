@@ -1,6 +1,7 @@
 'use client'
 
 import Link from 'next/link'
+import { EntityActivityLog } from '@/components/entity-activity-log'
 import { useEffect, useState } from 'react'
 import { useParams } from 'next/navigation'
 import { ArrowLeft, ExternalLink } from 'lucide-react'
@@ -225,6 +226,8 @@ export default function SupplierDetailsPage() {
           )}
         </CardContent>
       </Card>
+
+      <EntityActivityLog entityType="supplier" entityId={supplier?.id} />
     </div>
   )
 }

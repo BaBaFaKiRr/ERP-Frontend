@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { EntityActivityLog } from '@/components/entity-activity-log'
 import Link from 'next/link'
 import { useParams } from 'next/navigation'
 import { ArrowLeft, ExternalLink } from 'lucide-react'
@@ -321,6 +322,8 @@ export default function SalesInvoiceDetailPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <EntityActivityLog entityType="sales_invoice" entityId={row?.id} />
     </div>
   )
 }
