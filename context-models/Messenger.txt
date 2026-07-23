@@ -1,0 +1,618 @@
+# Cursor Prompt — Build LEJER Communication Service
+
+You are a senior staff software engineer tasked with designing and implementing a production-ready communication service for LEJER ERP.
+
+## Background
+
+LEJER is a multi-tenant ERP built with:
+
+* Next.js (App Router)
+* Node.js backend
+* PostgreSQL (Supabase)
+* Supabase Authentication
+* Existing Organization → Users → Roles architecture
+
+Every record in the database belongs to an organization via `organization_id`.
+
+This communication module must **not** be built as a standalone chat application. Instead, it should be a first-class ERP service tightly integrated with every business object.
+
+The goal is to create something similar to Slack + Microsoft Teams + Linear comments + Notion discussions.
+
+---
+
+# Overall Goals
+
+Create a Communication Service that supports:
+
+* Direct Messages
+* Group Chats
+* Channels
+* File Sharing
+* Rich text messages
+* Emoji reactions
+* Replies
+* Mentions
+* Read receipts
+* Notifications
+* Discussion threads attached to ERP objects
+
+The architecture should be modular enough that future features like AI summaries, approvals, and voice/video calling can be added without major refactoring.
+
+---
+
+# Non-Negotiable Requirements
+
+The communication system must support:
+
+## Direct Messages
+
+Two users can privately chat.
+
+Features:
+
+* Text
+* Images
+* Videos
+* Documents
+* Voice notes (placeholder architecture)
+* Reactions
+* Reply to message
+* Edit message
+* Delete message
+* Typing indicator
+* Read receipts
+* Unread counts
+
+---
+
+## Groups
+
+Users can create groups.
+
+Permissions:
+
+* Owner
+* Admin
+* Member
+* Guest
+
+Groups have:
+
+* Name
+* Description
+* Avatar
+* Members
+* Files
+* Search
+
+---
+
+## Channels
+
+Support organization channels.
+
+Examples:
+
+* #general
+* #sales
+* #warehouse
+* #production
+* #accounts
+
+Visibility:
+
+* Public
+* Private
+
+Users can be invited.
+
+---
+
+# ERP Discussion Threads (Most Important)
+
+Every ERP object must have its own discussion thread.
+
+Examples:
+
+Sales Order
+
+```
+SO-2028-9999
+```
+
+Purchase Order
+
+Invoice
+
+Quotation
+
+Customer
+
+Vendor
+
+Inventory Item
+
+Production Order
+
+Employee
+
+Expense
+
+Payment
+
+Ledger
+
+Task
+
+Project
+
+Every object page should include a Discussion section at the bottom.
+
+Example:
+
+---
+
+Sales Order
+
+SO-2028-9999
+
+...
+
+Discussion
+
+---
+
+John:
+
+Customer requested urgent dispatch.
+
+Sarah:
+
+Warehouse will ship tomorrow.
+
+Raj:
+
+Invoice generated.
+
+---
+
+This discussion should behave exactly like a normal conversation.
+
+Internally, each discussion thread should map to a conversation.
+
+---
+
+# Unified Conversation Model
+
+Instead of separate implementations, everything should use one Conversation model.
+
+Conversation Types:
+
+* direct
+* group
+* channel
+* object_thread
+
+An object discussion is simply another conversation with metadata:
+
+```
+object_type
+
+object_id
+```
+
+This allows replies, search, notifications, mentions, attachments, etc. to work everywhere.
+
+---
+
+# Mention System
+
+Implement a Slack-like mention system.
+
+Typing:
+
+```
+@
+```
+
+opens a searchable user menu.
+
+Example:
+
+```
+@John
+```
+
+Typing:
+
+```
+#
+```
+
+opens a searchable ERP object picker.
+
+Example:
+
+```
+#SO-2028-9999
+```
+
+Supported object types:
+
+Sales Orders
+
+Purchase Orders
+
+Invoices
+
+Quotations
+
+Customers
+
+Vendors
+
+Inventory Items
+
+Employees
+
+Projects
+
+Tasks
+
+Payments
+
+Ledgers
+
+Production Orders
+
+Stock Transfers
+
+Typing should immediately show autocomplete suggestions.
+
+The dropdown should support keyboard navigation.
+
+Selecting an item inserts a structured mention into the editor.
+
+Mentions must not be stored as plain text.
+
+Store structured metadata similar to:
+
+```
+{
+  type: "user",
+  id: "...",
+  display: "John Doe"
+}
+```
+
+or
+
+```
+{
+  type: "sales_order",
+  id: "...",
+  display: "SO-2028-9999"
+}
+```
+
+Messages should render mentions as clickable chips.
+
+Clicking a mention should navigate directly to the referenced ERP record.
+
+Hovering should show a small preview card.
+
+---
+
+# Rich Text Editor
+
+Use a modern editor (Lexical or TipTap).
+
+Requirements:
+
+* Mentions
+* File uploads
+* Paste images
+* Drag/drop files
+* Markdown shortcuts
+* Emoji picker
+* Links
+* Code blocks
+* Bullet lists
+* Numbered lists
+* Quotes
+
+---
+
+# File Sharing
+
+Support:
+
+Images
+
+Videos
+
+PDF
+
+Excel
+
+Word
+
+CSV
+
+ZIP
+
+Audio
+
+Store files in object storage.
+
+Database only stores metadata.
+
+Show inline previews when possible.
+
+---
+
+# Search
+
+Global message search.
+
+Filter by:
+
+Conversation
+
+Sender
+
+Date
+
+File
+
+Mentioned user
+
+Mentioned object
+
+Object type
+
+Message text
+
+---
+
+# Notifications
+
+Unread counts
+
+Mention notifications
+
+Reply notifications
+
+Desktop notifications
+
+Browser notifications
+
+Future-ready for mobile push notifications
+
+---
+
+# Database Design
+
+Design normalized tables.
+
+Expected tables include:
+
+conversations
+
+conversation_members
+
+messages
+
+attachments
+
+message_mentions
+
+message_reactions
+
+message_reads
+
+conversation_settings
+
+conversation_pins
+
+notifications
+
+Do not create duplicate schemas for object discussions.
+
+Everything should reuse the same conversation model.
+
+---
+
+# Backend
+
+Create a Communication module.
+
+Suggested folder structure:
+
+```
+communication/
+
+    conversations/
+
+    messages/
+
+    mentions/
+
+    reactions/
+
+    attachments/
+
+    notifications/
+
+    realtime/
+
+    permissions/
+```
+
+Use service classes.
+
+Avoid business logic in controllers.
+
+---
+
+# Realtime
+
+All messaging must be realtime.
+
+Support events:
+
+message.created
+
+message.updated
+
+message.deleted
+
+typing.started
+
+typing.stopped
+
+reaction.added
+
+reaction.removed
+
+message.read
+
+conversation.updated
+
+member.joined
+
+member.left
+
+---
+
+# Permissions
+
+Everything must respect:
+
+organization_id
+
+Users must never see conversations from another organization.
+
+Object discussions must check whether the user has permission to access the underlying ERP object before allowing access to the discussion.
+
+---
+
+# Frontend
+
+Desktop layout similar to Slack.
+
+Sidebar:
+
+* Direct Messages
+* Groups
+* Channels
+
+Main Area:
+
+Conversation header
+
+Messages
+
+Typing indicator
+
+Composer
+
+Object discussions should reuse the same message components.
+
+No duplicated UI.
+
+---
+
+# Reusable Components
+
+Build reusable components including:
+
+ConversationList
+
+ConversationHeader
+
+MessageBubble
+
+MessageComposer
+
+AttachmentViewer
+
+ReactionBar
+
+MentionChip
+
+MentionPicker
+
+UserMentionPicker
+
+ObjectMentionPicker
+
+DiscussionPanel
+
+DiscussionSidebar
+
+UnreadBadge
+
+TypingIndicator
+
+SearchPanel
+
+NotificationDropdown
+
+Every component should be reusable across the application.
+
+---
+
+# Future-Proof Architecture
+
+Design the schema and services so the following features can be added later without redesigning the database:
+
+* AI conversation summaries
+* AI action-item extraction
+* AI "Ask about this discussion"
+* Approval workflows inside chat
+* Polls
+* Scheduled messages
+* Pinned messages
+* Message forwarding
+* Audio/video calls
+* Presence status
+* Calendar integration
+* Workflow automation
+* External email bridge
+* External WhatsApp bridge
+
+---
+
+# Code Quality
+
+* Use TypeScript everywhere.
+* Follow existing project architecture and coding conventions.
+* Keep business logic separated from UI.
+* Write reusable hooks and services.
+* Use optimistic UI updates where appropriate.
+* Handle loading, offline, retry, and error states gracefully.
+* Build for scalability (millions of messages and thousands of organizations).
+* Avoid N+1 queries.
+* Add appropriate indexes to all messaging tables.
+* Use cursor-based pagination for message history.
+* Ensure APIs and components are well documented with concise comments where needed.
+
+---
+
+# Deliverables
+
+Implement the feature incrementally with clear commits or milestones:
+
+1. Database schema and migrations
+2. Backend services and APIs
+3. Realtime infrastructure
+4. Frontend messaging UI
+5. Mention system
+6. Object discussion threads
+7. File uploads
+8. Notifications
+9. Search
+10. Final testing, performance review, and documentation
+
+Before writing code, analyze the existing project structure and integrate with current authentication, organization, permissions, and UI patterns instead of introducing parallel systems.

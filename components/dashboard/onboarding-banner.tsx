@@ -39,11 +39,11 @@ export function OnboardingBanner() {
 
   if (collapsed) {
     return (
-      <div className="flex shrink-0 justify-center">
+      <div className="pointer-events-none absolute inset-x-0 top-0 z-20 flex justify-center">
         <button
           type="button"
           onClick={() => setCollapsedPersist(false)}
-          className="flex items-center gap-1 rounded-b-md border border-t-0 border-amber-200 bg-amber-50 px-3 py-1 text-xs font-medium text-amber-900 shadow-sm transition-colors hover:bg-amber-100 dark:border-amber-500/30 dark:bg-amber-950/60 dark:text-amber-100 dark:hover:bg-amber-950/80"
+          className="pointer-events-auto flex items-center gap-1 rounded-b-md border border-t-0 border-amber-200 bg-amber-50 px-3 py-1 text-xs font-medium text-amber-900 shadow-sm transition-colors hover:bg-amber-100 dark:border-amber-500/30 dark:bg-amber-950/60 dark:text-amber-100 dark:hover:bg-amber-950/80"
           aria-expanded={false}
           aria-label="Show complete setup prompt"
         >
@@ -55,7 +55,7 @@ export function OnboardingBanner() {
   }
 
   return (
-    <div className="flex shrink-0 items-center gap-2 border-b border-amber-200 bg-amber-50 px-2 py-2.5 dark:border-amber-500/30 dark:bg-amber-950/50">
+    <div className="absolute inset-x-0 top-0 z-20 flex items-center gap-2 border-b border-amber-200 bg-amber-50 px-2 py-2.5 shadow-sm dark:border-amber-500/30 dark:bg-amber-950/50">
       <Link
         href="/onboarding"
         className="flex min-w-0 flex-1 items-center gap-4 rounded-md px-2 py-0.5 transition-colors hover:bg-amber-100/90 dark:hover:bg-amber-950/70"

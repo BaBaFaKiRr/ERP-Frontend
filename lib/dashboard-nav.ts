@@ -11,6 +11,7 @@ import {
   Cog,
   Shield,
   HelpCircle,
+  MessageSquare,
 } from 'lucide-react'
 
 export type NavChild = { name: string; href: string }
@@ -124,6 +125,12 @@ export const MAIN_NAV: NavItem[] = [
     href: '/dashboard',
     icon: LayoutDashboard,
     match: (p) => p === '/dashboard',
+  },
+  {
+    name: 'Messages',
+    href: '/dashboard/messages',
+    icon: MessageSquare,
+    match: (p) => p.startsWith('/dashboard/messages'),
   },
   {
     name: 'Inventory',

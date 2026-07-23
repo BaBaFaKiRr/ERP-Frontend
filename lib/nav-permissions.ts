@@ -3,6 +3,7 @@ import type { NavItem } from '@/lib/dashboard-nav'
 /** Module prefixes used in permission keys → nav section. */
 const MODULE_PREFIX_BY_NAV: Record<string, string> = {
   Home: 'home',
+  Messages: 'communication',
   Inventory: 'inventory',
   Mfg: 'manufacturing',
   Accounts: 'accounts',

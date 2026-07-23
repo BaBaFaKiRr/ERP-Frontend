@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { ImperativePanelHandle } from 'react-resizable-panels'
-import { useRouter } from 'next/navigation'
+import { useRouter, usePathname } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { useTheme } from 'next-themes'
 import { AppSidebar } from '@/components/layout/app-sidebar'
@@ -16,6 +16,7 @@ import {
 import { OnboardingBanner } from '@/components/dashboard/onboarding-banner'
 import { clearCachedAccessToken } from '@/lib/erp-api'
 import { OrganizationProvider, useOrganization } from '@/lib/organization-context'
+import { cn } from '@/lib/utils'
 
 const ASSISTANT_LAYOUT_LS_KEY = 'erp-assistant-panel-layout'
 
@@ -44,8 +45,10 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
   const [mounted, setMounted] = useState(false)
   const assistantPanelRef = useRef<ImperativePanelHandle>(null)
   const router = useRouter()
+  const pathname = usePathname()
   const supabase = createClient()
   const { resolvedTheme, setTheme } = useTheme()
+  const isFullBleedRoute = pathname.startsWith('/dashboard/messages')
   const {
     me,
     organizations,
@@ -117,48 +120,58 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
           assistantOpen={assistantOpen}
           onToggleAssistant={() => setAssistantOpen((o) => !o)}
         />
-        <OnboardingBanner />
 
-        <ResizablePanelGroup
-          direction="horizontal"
-          className="min-h-0 flex-1"
-          onLayout={(sizes) => {
-            if (!assistantOpen || sizes.length !== 2) return
-            setAssistantLayout(sizes)
-            localStorage.setItem(ASSISTANT_LAYOUT_LS_KEY, JSON.stringify(sizes))
-          }}
-        >
-          <ResizablePanel
-            id="dashboard-main"
-            order={1}
-            defaultSize={assistantOpen ? (assistantLayout?.[0] ?? 72) : 100}
-            minSize={35}
-            className="flex min-h-0 min-w-0 flex-col"
+        <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden">
+          <OnboardingBanner />
+
+          <ResizablePanelGroup
+            direction="horizontal"
+            className="min-h-0 flex-1"
+            onLayout={(sizes) => {
+              if (!assistantOpen || sizes.length !== 2) return
+              setAssistantLayout(sizes)
+              localStorage.setItem(ASSISTANT_LAYOUT_LS_KEY, JSON.stringify(sizes))
+            }}
           >
-            <div className="min-h-0 flex-1 overflow-auto">{children}</div>
-          </ResizablePanel>
+            <ResizablePanel
+              id="dashboard-main"
+              order={1}
+              defaultSize={assistantOpen ? (assistantLayout?.[0] ?? 72) : 100}
+              minSize={35}
+              className="flex min-h-0 min-w-0 flex-col"
+            >
+              <div
+                className={cn(
+                  'min-h-0 flex-1',
+                  isFullBleedRoute ? 'flex flex-col overflow-hidden' : 'overflow-auto',
+                )}
+              >
+                {children}
+              </div>
+            </ResizablePanel>
 
-          <ResizableHandle
-            withHandle
-            className={assistantOpen ? 'bg-border/80' : 'pointer-events-none w-0 opacity-0'}
-          />
+            <ResizableHandle
+              withHandle
+              className={assistantOpen ? 'bg-border/80' : 'pointer-events-none w-0 opacity-0'}
+            />
 
-          <ResizablePanel
-            ref={assistantPanelRef}
-            id="dashboard-assistant"
-            order={2}
-            collapsible
-            defaultSize={0}
-            minSize={18}
-            maxSize={55}
-            collapsedSize={0}
-            className="flex min-h-0 min-w-0 flex-col"
-          >
-            {assistantOpen ? (
-              <AssistantPanel onClose={() => setAssistantOpen(false)} />
-            ) : null}
-          </ResizablePanel>
-        </ResizablePanelGroup>
+            <ResizablePanel
+              ref={assistantPanelRef}
+              id="dashboard-assistant"
+              order={2}
+              collapsible
+              defaultSize={0}
+              minSize={18}
+              maxSize={55}
+              collapsedSize={0}
+              className="flex min-h-0 min-w-0 flex-col"
+            >
+              {assistantOpen ? (
+                <AssistantPanel onClose={() => setAssistantOpen(false)} />
+              ) : null}
+            </ResizablePanel>
+          </ResizablePanelGroup>
+        </div>
       </div>
     </div>
   )

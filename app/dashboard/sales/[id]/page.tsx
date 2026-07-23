@@ -37,6 +37,7 @@ import {
 } from '@/lib/dispatch-eligibility'
 import { cn } from '@/lib/utils'
 import { EntityActivityLog } from '@/components/entity-activity-log'
+import { DiscussionPanel } from '@/components/messages/DiscussionPanel'
 
 type LineRow = {
   id: string
@@ -768,6 +769,7 @@ export default function SalesOrderDetailPage() {
       </div>
 
       <EntityActivityLog entityType="sales_order" entityId={order?.id} />
+      <DiscussionPanel objectType="sales_order" objectId={order?.id} title="Discussion" />
     </div>
   )
 }

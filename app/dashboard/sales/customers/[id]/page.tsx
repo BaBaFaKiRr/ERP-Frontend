@@ -18,6 +18,7 @@ import {
 } from '@/components/ui/table'
 import { cn } from '@/lib/utils'
 import { EntityActivityLog } from '@/components/entity-activity-log'
+import { DiscussionPanel } from '@/components/messages/DiscussionPanel'
 
 type Customer = {
   id: string
@@ -277,6 +278,7 @@ export default function CustomerDetailsPage() {
       </Card>
 
       <EntityActivityLog entityType="customer" entityId={customer.id} />
+      <DiscussionPanel objectType="customer" objectId={customer.id} />
     </div>
   )
 }
