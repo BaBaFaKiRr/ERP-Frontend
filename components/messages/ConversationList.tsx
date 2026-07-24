@@ -2,7 +2,7 @@
 
 import { Hash, Lock, Users } from 'lucide-react'
 import type { Conversation, ConversationType } from '@/lib/communication-types'
-import { UnreadBadge } from '@/components/messages/UnreadBadge'
+import { UnreadDot } from '@/components/messages/UnreadBadge'
 import { cn } from '@/lib/utils'
 
 function iconFor(type: ConversationType) {
@@ -54,17 +54,28 @@ export function ConversationList({
               active ? 'bg-accent' : 'hover:bg-muted/60',
             )}
           >
-            <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#1c2130] text-xs font-semibold text-white">
+            <div className="relative mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#1c2130] text-xs font-semibold text-white">
               {Icon ? (
                 <Icon className="h-3.5 w-3.5" />
               ) : (
                 titleOf(c).slice(0, 1).toUpperCase()
               )}
+              <UnreadDot
+                show={c.unread_count > 0}
+                className="absolute -right-0.5 -top-0.5 ring-2 ring-background"
+                title="Unread messages"
+              />
             </div>
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2">
-                <span className="truncate text-sm font-medium">{titleOf(c)}</span>
-                <UnreadBadge count={c.unread_count} className="ml-auto" />
+                <span
+                  className={cn(
+                    'truncate text-sm',
+                    c.unread_count > 0 ? 'font-semibold' : 'font-medium',
+                  )}
+                >
+                  {titleOf(c)}
+                </span>
               </div>
               <div className="truncate text-xs text-muted-foreground">{previewOf(c)}</div>
             </div>

@@ -16,6 +16,7 @@ import {
 import { OnboardingBanner } from '@/components/dashboard/onboarding-banner'
 import { clearCachedAccessToken } from '@/lib/erp-api'
 import { OrganizationProvider, useOrganization } from '@/lib/organization-context'
+import { CommunicationNotificationsProvider } from '@/lib/communication-notifications-context'
 import { cn } from '@/lib/utils'
 
 const ASSISTANT_LAYOUT_LS_KEY = 'erp-assistant-panel-layout'
@@ -184,7 +185,9 @@ export default function DashboardLayout({
 }) {
   return (
     <OrganizationProvider>
-      <DashboardShell>{children}</DashboardShell>
+      <CommunicationNotificationsProvider>
+        <DashboardShell>{children}</DashboardShell>
+      </CommunicationNotificationsProvider>
     </OrganizationProvider>
   )
 }

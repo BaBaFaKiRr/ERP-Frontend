@@ -1,6 +1,7 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { Suspense, useCallback, useEffect, useMemo, useState } from 'react'
+import { useSearchParams } from 'next/navigation'
 import {
   Hash,
   MessageSquare,
@@ -34,12 +35,29 @@ import {
 } from '@/lib/communication-api'
 import type { CommUser, Conversation } from '@/lib/communication-types'
 import { useOrganization } from '@/lib/organization-context'
+import { useCommunicationNotifications } from '@/lib/communication-notifications-context'
 import { cn } from '@/lib/utils'
 
 type SidebarTab = 'all' | 'direct' | 'group' | 'channel'
 
 export default function MessagesPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
+          Loading messages…
+        </div>
+      }
+    >
+      <MessagesPageInner />
+    </Suspense>
+  )
+}
+
+function MessagesPageInner() {
   const { me } = useOrganization()
+  const { refreshUnread, setActiveConversationId } = useCommunicationNotifications()
+  const searchParams = useSearchParams()
   const [conversations, setConversations] = useState<Conversation[]>([])
   const [activeId, setActiveId] = useState<string | null>(null)
   const [tab, setTab] = useState<SidebarTab>('all')
@@ -63,12 +81,13 @@ export default function MessagesPage() {
       const data = await listConversations()
       setConversations(data)
       setError(null)
+      void refreshUnread()
       return data
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to load conversations')
       return []
     }
-  }, [])
+  }, [refreshUnread])
 
   const handleThreadMessageEvent = useCallback(() => {
     void refresh()
@@ -79,6 +98,17 @@ export default function MessagesPage() {
     void refresh().finally(() => setLoading(false))
     void listOrgChatMembers().then(setMembers).catch(() => setMembers([]))
   }, [refresh])
+
+  // Deep-link: /dashboard/messages?c=<conversationId>
+  useEffect(() => {
+    const c = searchParams.get('c')
+    if (c) setActiveId(c)
+  }, [searchParams])
+
+  useEffect(() => {
+    setActiveConversationId(activeId)
+    return () => setActiveConversationId(null)
+  }, [activeId, setActiveConversationId])
 
   useEffect(() => {
     let close: (() => void) | undefined

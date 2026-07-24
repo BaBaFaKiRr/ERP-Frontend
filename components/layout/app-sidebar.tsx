@@ -9,6 +9,8 @@ import { LEJER_LOGO_MARK_SRC } from '@/lib/branding'
 import { MAIN_NAV, childActive, type NavItem } from '@/lib/dashboard-nav'
 import { filterNavForPermissions } from '@/lib/nav-permissions'
 import { useOrganization } from '@/lib/organization-context'
+import { useCommunicationNotifications } from '@/lib/communication-notifications-context'
+import { UnreadDot } from '@/components/messages/UnreadBadge'
 
 function NavFlyout({
   item,
@@ -71,6 +73,7 @@ export function AppSidebar() {
   const pathname = usePathname()
   const [flyout, setFlyout] = useState<string | null>(null)
   const { permissions, permissionBypass } = useOrganization()
+  const { hasUnread } = useCommunicationNotifications()
   const navItems = filterNavForPermissions(MAIN_NAV, permissions, permissionBypass)
 
   return (
@@ -141,7 +144,16 @@ export function AppSidebar() {
                   aria-hidden
                 />
               )}
-              <Icon size={22} strokeWidth={1.75} className="shrink-0" />
+              <span className="relative">
+                <Icon size={22} strokeWidth={1.75} className="shrink-0" />
+                {item.name === 'Messages' ? (
+                  <UnreadDot
+                    show={hasUnread}
+                    className="absolute -right-0.5 -top-0.5 ring-2 ring-[#1c2130]"
+                    title="Unread messages"
+                  />
+                ) : null}
+              </span>
               <span className="max-w-[64px] truncate text-center">{item.name}</span>
             </Link>
           )
